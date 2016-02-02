@@ -73,7 +73,21 @@ let rec simple  f = match f with
   |Equiv(f1,f2) -> simple(And(Imply(f1,f2),Imply(f2,f1)))
     
 
-let subst f tau = f		(* [TODO] *)
+let subst f tau = 
+  let f_simple = simple f in 
+  let rec subst_rec f x b = match f with 
+    |Const(_) -> f
+    |Lit (Pos d) when (d = x) -> Const(b)
+    |Lit (Neg d) when (d = x) -> Const(not b)
+    |Or (g,d)-> Or(subst_rec g x b, subst_rec d x b)
+    |And (g,d)-> And(subst_rec g x b, subst_rec d x b)
+  in
+  let rec subst_list l f = match l with 
+    |[] -> f
+    |(x,b)::q -> subst_list q (subst_rec f x b) in 
+ 
+  subst_list tau f
+    
   
 let formulaeToCnf fl = 
   let rec simpleToPre f = match f with 
@@ -110,29 +124,24 @@ let dummyCNF =
 let sat_solver = ref "./minisat"
 
 (** Return the result of minisat called on [cnf] **)
-let testCNF cnf = 
-  let cnf_display = displayCnf cnf in
-  let fn_cnf = "temp.out" in
+let testCNF cnf =
+  let cnf_display = displayCnf cnf
+  and fn_cnf = "temp_cnf.out"
+  and fn_res = "temp_res.out" in
   let oc = open_out fn_cnf in
-  Printf.fprintf oc  "%s\n" cnf_display;
+  Printf.fprintf oc "%s\n" cnf_display;
   close_out oc;
   let resc = (Unix.open_process_in
 		(!sat_solver ^ " \"" ^ (String.escaped fn_cnf)
-		 ^ "\"") : in_channel) in
-  let resSAT = let acc = ref [] in
-	       try while true do
-		     acc := (input_line resc) :: !acc
-		   done; ""
-	       with End_of_file ->
-		 close_in resc;
-		 if List.length !acc = 0
-		 then begin
-		     log ~level:High "It seems that there is no executable called 'minisat' at top level.";
-		     exit 0;
-		   end
-		 else String.concat "\n" (List.rev !acc) in
-  close_in resc;
-  List.hd (List.rev (Str.split (Str.regexp " +") resSAT))
+		 ^ "\" \"" ^ (String.escaped fn_res)^"\"") : in_channel) in
+  Unix.close_process_in resc;
+  let resSAT = let ic = open_in fn_res in
+	       try (let line1 = input_line ic in
+		    let line2 = try input_line ic with _ -> "" in
+		    close_in ic;
+		    line1^line2)
+	       with e -> close_in_noerr ic; raise e in
+  resSAT
 	   
 let test () =
   Printf.printf "%s\n" (displayFormula (simple (Not(And(Lit(Pos(1)),Lit(Pos(2)))))));
