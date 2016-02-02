@@ -1,0 +1,17 @@
+data.cmi :
+formula.cmi :
+generate.cmi : formula.cmi data.cmi
+md.cmi : data.cmi
+param.cmi :
+data.cmo : param.cmi data.cmi
+data.cmx : param.cmx data.cmi
+formula.cmo : param.cmi formula.cmi
+formula.cmx : param.cmx formula.cmi
+generate.cmo : param.cmi formula.cmi data.cmi generate.cmi
+generate.cmx : param.cmx formula.cmx data.cmx generate.cmi
+main.cmo : param.cmi md.cmi generate.cmi formula.cmi data.cmi
+main.cmx : param.cmx md.cmx generate.cmx formula.cmx data.cmx
+md.cmo : param.cmi data.cmi md.cmi
+md.cmx : param.cmx data.cmx md.cmi
+param.cmo : param.cmi
+param.cmx : param.cmi
