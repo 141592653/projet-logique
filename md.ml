@@ -19,6 +19,15 @@ By default:
 open Param
 open Data
 open Printf
+
+let xor b1 b2 = match (b1,b2) with
+  |(true,true)|(false,false) -> false
+  |(true,false)|(false,true) -> true
        
 (*** Main function ***)	  
-let compute input = Array.make 128 false (* [TODO] *)
+let compute input =
+  let d = Array.make 128 false in 
+  for i = 0 to 10 do 
+    d.(i) <- xor (xor d.((i*42) mod 10) input.((i*13) mod 512)) (xor input.((i*14 + 1) mod 512) input.((i*15 + 2) mod 512)) 
+  done;
+  d

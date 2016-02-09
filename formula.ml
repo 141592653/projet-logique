@@ -102,15 +102,20 @@ let formulaeToCnf fl =
     |Lit (l) -> [[l]]
     |Or(f1,f2) -> [(List.hd (preToCNF f1)) @ (List.hd (preToCNF f2))]
     |And(f1,f2) -> (preToCNF f1)@(preToCNF f2) 
+    |Const(true) -> Printf.printf "Attention, constante dans la cnf"; [[Pos 0]]
+    |Const(false) ->  Printf.printf "Attention, constante dans la cnf"; [[Neg 0]]
     |_ -> [[]]
   in 
   preToCNF (simpleToPre (simple fl))
 
+
+(************Affichage d'une clause ****************)
 let rec displayClause c = match c with
   |[] -> ""
   |[l] -> displayLit l
   |l::q -> (displayLit l)^"\\/"^(displayClause q)
     
+(******************Affichage d'une formule cnf *******************)
 let rec displayCnf cnf = match cnf with 
   |[] -> ""
   |[c] -> "{"^displayClause c^"}"
@@ -132,7 +137,7 @@ let nb_var_cnf cnf =
 	  let _ = Hashtbl.find h l in 
 	  ()
 	with
-	  Not_found -> Hashtbl.add h l 0;
+	  Not_found -> Hashtbl.add h l 0; (*si toujours pas dans la table on l'ajoute*)
 	    nb_var := !nb_var + 1
       end;
 	nb_var_clause q in 
@@ -195,6 +200,7 @@ let test () =
   Printf.printf "%s\n" (displayCnf (formulaeToCnf (Not(And(Lit(Pos(1)),Lit(Pos(2)))))));
   Printf.printf "%s\n" (displayCnf (formulaeToCnf (Xor(Lit(Pos(1)),Lit(Neg(1))))));
   Printf.printf "%s\n" (displayCnf (formulaeToCnf (Not(Equiv(Lit(Neg(1)),Not(And(Lit(Pos(1)),Lit(Neg(2)))))))));
+  Printf.printf "%s\n" (displayCnf (formulaeToCnf (Not(Equiv(Const(true),Not(And(Lit(Pos(1)),Const(false))))))));(*faux*)
   Printf.printf "%d\n" (nb_var_cnf dummyCNF);
    Printf.printf "%s\n" (cnfToDimacs dummyCNF);
   Printf.printf "%s\n" (testCNF dummyCNF)
