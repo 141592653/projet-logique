@@ -109,38 +109,21 @@ let formulaeToCnf fl =
   preToCNF (simpleToPre (simple fl))
 
 
-(************Affichage d'une clause ****************)
-let rec displayClause c = match c with
-  |[] -> ""
-  |[l] -> displayLit l
-  |l::q -> (displayLit l)^"\\/"^(displayClause q)
-    
-(******************Affichage d'une formule cnf *******************)
-let rec displayCnf cnf = match cnf with 
-  |[] -> ""
-  |[c] -> "{"^displayClause c^"}"
-  | c::q -> "{"^(displayClause c)^ "} /\\ "^(displayCnf q)
+
 
 
 (*********************** Conversion au format dimacs ************************)
 
 (*compte grâce à une table de hachage le nombre de variables dans une formule*)
 let nb_var_cnf cnf = 
-  let h = Hashtbl.create 10 in 
   let nb_var = ref 0 in 
   let rec nb_var_clause c = 
     match c with 
     |[] -> ()
     |(Pos l)::q | (Neg l)::q -> 
-      begin
-	try 
-	  let _ = Hashtbl.find h l in 
-	  ()
-	with
-	  Not_found -> Hashtbl.add h l 0; (*si toujours pas dans la table on l'ajoute*)
-	    nb_var := !nb_var + 1
-      end;
-	nb_var_clause q in 
+      if l > !nb_var then 
+	nb_var := l;
+      nb_var_clause q in 
   let rec nb_var_rec cnf = match cnf with 
     |[] -> ()
     |c::q -> nb_var_clause c;
@@ -148,19 +131,23 @@ let nb_var_cnf cnf =
   nb_var_rec cnf;
   !nb_var
 
-      
-
-let rec clauseToDimacs c = match c with
+(************Affichage d'une clause ****************)
+let rec displayClause c = match c with
   |[] -> ""
   |[l] -> displayLit l
-  |l::q -> (displayLit l)^" "^(clauseToDimacs q)
+  |l::q -> (displayLit l)^" "^(displayClause q)
     
-let cnfToDimacs cnf = 
-  let rec cnfToDimacs_ref cnf = match cnf with 
-  |[] -> ""
-  |[c] -> clauseToDimacs c ^ " 0\n"
-  |c::q -> clauseToDimacs c^ " 0\n"^(cnfToDimacs_ref q) in 
-  "p cnf "^string_of_int (nb_var_cnf cnf)^" "^string_of_int (List.length cnf)^"\n"^cnfToDimacs_ref cnf
+(******************Affichage d'une formule cnf *******************)
+let rec displayCnf cnf = 
+  let rec cnfToDimacs_rec cnf = match cnf with 
+    |[] -> ""
+    |[c] -> displayClause c ^ " 0\n"
+    |c::q -> displayClause c^ " 0\n"^(cnfToDimacs_rec q) in 
+
+  "p cnf "^string_of_int (nb_var_cnf cnf)^" "^string_of_int (List.length cnf)^"\n"^cnfToDimacs_rec cnf
+
+      
+
 
 
 (*********************** Fin conversion au format dimacs *******************)
@@ -175,7 +162,7 @@ let sat_solver = ref "./minisat"
 
 (** Return the result of minisat called on [cnf] **)
 let testCNF cnf =
-  let cnf_display = cnfToDimacs cnf
+  let cnf_display = displayCnf cnf
   and fn_cnf = "temp_cnf.out"
   and fn_res = "temp_res.out" in
   let oc = open_out fn_cnf in
@@ -202,7 +189,7 @@ let test () =
   Printf.printf "%s\n" (displayCnf (formulaeToCnf (Not(Equiv(Lit(Neg(1)),Not(And(Lit(Pos(1)),Lit(Neg(2)))))))));
   Printf.printf "%s\n" (displayCnf (formulaeToCnf (Not(Equiv(Const(true),Not(And(Lit(Pos(1)),Const(false))))))));(*faux*)
   Printf.printf "%d\n" (nb_var_cnf dummyCNF);
-   Printf.printf "%s\n" (cnfToDimacs dummyCNF);
+   Printf.printf "%s\n" (displayCnf dummyCNF);
   Printf.printf "%s\n" (testCNF dummyCNF)
 
 
