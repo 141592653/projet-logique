@@ -28,6 +28,6 @@ let xor b1 b2 = match (b1,b2) with
 let compute input =
   let d = Array.make 128 false in 
   for i = 0 to 10 do 
-    d.(i) <- xor (xor d.((i*42) mod 10) input.((i*13) mod 512)) (xor input.((i*14 + 1) mod 512) input.((i*15 + 2) mod 512)) 
+    d.(i) <- xor (xor d.(i+10) input.((i*13) mod 512)) (xor input.((i*14 + 1) mod 512) input.((i*15 + 2) mod 512)) 
   done;
   d

@@ -29,6 +29,7 @@ let launch_test () =
 
 (** Return prefix of filename [s] (before '.') *)
 let basename s =
+  
   try String.sub s 0 (String.rindex s '.')
   with Not_found -> s
 
@@ -41,6 +42,7 @@ let computeRes fn_input =
   and fn_res = String.concat "" [basename fn_input; fn_res_suffix]
   and fn_digest = String.concat "" [basename fn_input; fn_digest_suffix] 
   and fn_sol = String.concat "" [basename fn_input; fn_sol_suffix] in
+ 
 
   (* Read inputted file *)
   let input = let ic = open_in fn_input in
@@ -121,9 +123,11 @@ let computeRes fn_input =
 		   with e -> close_in_noerr ic; raise e in
       log ~level:Low (sprintf "Parsing %s ..." solSAT);
       let inputFound = Data.parseSol solSAT in
+      
       match inputFound with
       | None -> log ~level:High (sprintf "UNSAT!\nNo input was found.");
       | Some input -> begin
+	
 	  log (sprintf "Writing found input in %s..." fn_res);
 	  log ~level:High (sprintf "### Found input: [ %s]" (Data.displayInput input));
 	  let oc = open_out fn_res in

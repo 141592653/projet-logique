@@ -65,8 +65,7 @@ let rec simple  f = match f with
     |(a,b) -> Or(a,b))
   |And(f1,f2)-> (match  simple f1, simple f2 with 
     |(_,Const(false)) |(Const(false),_)  -> Const(false)
-    |(a,Const(true)) -> a
-    |(Const(true),a) -> a
+    |(a,Const(true))|(Const(true),a) -> a
     |(a,b) -> And(a,b))
   |Xor(f1,f2) -> simple(Or(And(Not(f1),f2),And(f1,Not(f2))))
   |Imply(f1,f2) -> simple(Or(Not(f1),f2))
@@ -93,7 +92,13 @@ let subst f tau =
 let formulaeToCnf fl = 
   let rec simpleToPre f = match f with 
     |Const _ | Lit _ -> f
-    |Or(And(f1,f2),f3) |Or(f3,And(f1,f2)) -> And(simpleToPre(Or(f1,f3)), simpleToPre(Or(f2,f3)))
+    |Or(f1,f2) -> let nf1 = simpleToPre f1 and nf2 = simpleToPre f2 in
+		  begin
+		    match Or(nf1,nf2) with 
+		    |Or(And(f1,f2),f3) |Or(f3,And(f1,f2)) -> And(simpleToPre(Or(f1,f3)), simpleToPre(Or(f2,f3)))
+		    |f -> f
+		  end
+
     |And(f1,f2) -> And(simpleToPre f1, simpleToPre f2)
     |_ -> f
   in
@@ -102,8 +107,8 @@ let formulaeToCnf fl =
     |Lit (l) -> [[l]]
     |Or(f1,f2) -> [(List.hd (preToCNF f1)) @ (List.hd (preToCNF f2))]
     |And(f1,f2) -> (preToCNF f1)@(preToCNF f2) 
-    |Const(true) -> Printf.printf "Attention, constante dans la cnf"; [[Pos 0]]
-    |Const(false) ->  Printf.printf "Attention, constante dans la cnf"; [[Neg 0]]
+    |Const(true) -> Printf.printf "Attention, constante dans la cnf\n\n\n\n"; [[Pos 0]]
+    |Const(false) ->  Printf.printf "Attention, constante dans la cnf\n\n\n\n\n"; [[Neg 0]]
     |_ -> [[]]
   in 
   preToCNF (simpleToPre (simple fl))
@@ -188,9 +193,18 @@ let test () =
   Printf.printf "%s\n" (displayCnf (formulaeToCnf (Xor(Lit(Pos(1)),Lit(Neg(1))))));
   Printf.printf "%s\n" (displayCnf (formulaeToCnf (Not(Equiv(Lit(Neg(1)),Not(And(Lit(Pos(1)),Lit(Neg(2)))))))));
   Printf.printf "%s\n" (displayCnf (formulaeToCnf (Not(Equiv(Const(true),Not(And(Lit(Pos(1)),Const(false))))))));(*faux*)
+  let xor = (Equiv(Const(false) , 
+					     Xor(
+					       Xor(Const(true),Lit(Pos(1))),
+					       Xor(Lit(Pos(2)),Lit(Pos(3)))
+					     )
+				       )) in
+  Printf.printf "%s\n" (displayCnf (formulaeToCnf xor));
+  Printf.printf "%s\n" (testCNF (formulaeToCnf xor ));
+  Printf.printf "%s\n" (displayFormula (simple xor ));
   Printf.printf "%d\n" (nb_var_cnf dummyCNF);
-   Printf.printf "%s\n" (displayCnf dummyCNF);
-  Printf.printf "%s\n" (testCNF dummyCNF)
+  Printf.printf "%s\n" (displayCnf dummyCNF);
+  Printf.printf "%s\n" (testCNF dummyCNF);
 
 
 
