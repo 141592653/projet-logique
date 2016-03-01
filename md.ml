@@ -30,33 +30,65 @@ let xor b1 b2 = match (b1,b2) with
   |(true,true)|(false,false) -> false
   |(true,false)|(false,true) -> true
 
+let xor_32 a b = 
+  let res = Array.make 32 false in 
+  for i = 0 to 31 do 
+    res.(i) <- xor a.(i) b.(i)
+  done;
+  res
+    
+
 (** Fonction non linéaires *)
 
-let f_32(b,c,d) =
+let f_32 b c d  =
   let ret = Array.make 32 false in 
   for i = 0 to 31 do 
     ret.(i) <- (b.(i) && c.(i)) || (not b.(i) && d.(i))
   done;
   ret
 
-let g_32(b,c,d) = 
+let g_32 b c d = 
 let ret = Array.make 32 false in 
   for i = 0 to 31 do 
     ret.(i) <- (b.(i) && d.(i)) || (c.(i) && not d.(i))
   done;
   ret
-let h_32(b,c,d) = 
+let h_32 b c d = 
 let ret = Array.make 32 false in 
   for i = 0 to 31 do 
     ret.(i) <- xor b.(i) (xor c.(i) d.(i))
   done;
   ret
-let i_32(b,c,d) = 
+let i_32 b c d = 
 let ret = Array.make 32 false in 
   for i = 0 to 31 do 
     ret.(i) <- xor c.(i) (b.(i)|| not d.(i))
   done;
-  ret
+ret
+
+(*renvoie la fonction non linéaire associée au round r*)
+let non_linear r = 
+  match r with 
+  |0 -> f_32
+  |1 -> g_32
+  |2 -> h_32
+  |3 -> i_32
+  |_ -> failwith "Round supérieur à 4"
+
+(*choix du mot*)
+let choice1 i =  i
+let choice2 i =  (5*i + 1) mod 16
+let choice3 i =  (3*i + 5) mod 16
+let choice4 i =  (7*i) mod 16
+
+(*renvoie la fonction de choix du mot de 32 bits dans input associée au round r*)
+let choice r = 
+  match r with 
+  |0 -> choice1
+  |1 -> choice2
+  |2 -> choice3
+  |3 -> choice4
+  |_ -> failwith "Round supérieur à 4"
 
 
 (*convertit une matrice de taille 4*32 en digest de 128 bits*)
@@ -81,6 +113,16 @@ let convert_input_to_32 input =
 let compute input =
   let input_32 = convert_input_to_32 input in 
   let digest = Array.make_matrix 4 32 true in 
+  let a = ref a0 and b = ref b0 and c = ref c0 and d = ref d0 in 
+  for i = 0 to 63 do 
+    let round = i / 16 in 
+    let temp = Array.copy !d in 
+    d:=!c;
+    c:=!b;
+    (*b:=*)
+    
+    
+  done;
   convert432_to_digest digest
 
 
