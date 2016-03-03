@@ -109,20 +109,45 @@ let convert_input_to_32 input =
   done;
   input_32
 
+(*addition de deux mots 32 bits en little endian*)
+let add_32 a b = 
+  let ret = ref false in
+  let res = Array.make 32 false in 
+  for i = 0 to 31 do
+    match (a.(i),b.(i),!ret) with
+    |(false,false,false)  -> ret := false ; res.(i) <- false
+    |(false,false,true) |(false,true,false) |(true,false,false)-> ret := false; res.(i) <- true
+    |(true,true, false) |(true,false,true) |(false,true,true) -> ret := true; res.(i) <- false
+    |(true,true,true) -> ret := true; res.(i) <- true
+  done;
+  res
+
+(* rotation vers la gauche en little endian*)
+let left_rotate a n = 
+  let res = Array.make 32 false in
+  for i = 0 to 31 do 
+    res.((i+n) mod 32) <- a.(i)
+  done;
+  res
+
 (*** Main function ***)	  
 let compute input =
   let input_32 = convert_input_to_32 input in 
-  let digest = Array.make_matrix 4 32 true in 
   let a = ref a0 and b = ref b0 and c = ref c0 and d = ref d0 in 
-  for i = 0 to 63 do 
+  for i = 0 to 15 do 
     let round = i / 16 in 
     let temp = Array.copy !d in 
+    let f = non_linear round !b !c !d in 
     d:=!c;
     c:=!b;
-    (*b:=*)
-    
-    
+    b:= add_32 !b (left_rotate (add_32 (add_32 !a f ) (add_32 vectK.(i) input_32.(choice round i))) vectS.(i)) ;
+    a:= temp
   done;
+
+  let digest = Array.make_matrix 4 32 true in 
+  
+  digest.(0) <- add_32 !a a0; digest.(1) <- add_32 !b b0;
+  digest.(2) <- add_32 !c c0; digest.(3) <- add_32 !d d0;
   convert432_to_digest digest
 
 
