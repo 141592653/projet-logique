@@ -11,6 +11,9 @@ open Printf
 open Formula
 open Data
 
+let pos n = Lit(Pos n)
+let neg n = Lit(Neg n)
+
 (*Variables de 1 à 512 : input*)
 let input i j = 1 + i*32 + j
 
@@ -20,50 +23,58 @@ let begin_round = 513
 (*nombre de variables dans un step*)
 let step_nb = 9 * 32
 
-(*ai , bi ,ci, di avec i le numéro du step*)
-let a i j = begin_round + i*step_nb + j
-let b i j = begin_round + i*step_nb + 32 + j
-let c i j = begin_round + i*step_nb + (2*32) + j
-let d i j = begin_round + i*step_nb + (3*32) + j
-let a_pos i j = Lit(Pos(a i j))
-let a_neg i j = Lit(Neg(a i j))
-let b_pos i j = Lit(Pos(b i j))
-let b_neg i j = Lit(Neg(b i j))
-let c_pos i j = Lit(Pos(c i j))
-let c_neg i j = Lit(Neg(c i j))
-let d_pos i j = Lit(Pos(d i j))
-let d_neg i j = Lit(Neg(d i j))
+(*numéro dans le step*)
+let a_nb= 0
+let b_nb= 1
+let c_nb= 2
+let d_nb= 3
+let non_lin_nb= 4
+let carry41_nb= 5
+let carry42_nb= 6
+let sum4_nb= 7
+let carry_lr_nb= 8
+
+let test = true
+
+(* permet de donner le numéro de la variable*)
+let var_index step_index s i = 
+  if test then 
+    input step_index i
+  else
+    begin_round + s*step_nb + (step_index * 32) + i
+
+(*as , bs ,cs, ds avec s le numéro du step*)
+let a s i = var_index a_nb s i
+let b s i = var_index b_nb s i
+let c s i = var_index c_nb s i
+let d s i = var_index d_nb s i
 
 (*résultat de la fonction non linéaire*)
-let non_lin i j = begin_round + i*step_nb + (4*32) + j
-let non_lin_pos i j = Lit(Pos(non_lin i j))
-let non_lin_neg i j = Lit(Neg(non_lin i j))
+let non_lin s i = var_index non_lin_nb s i
 
-(*addition de a,f , k et input*)
-let carry41 i j = begin_round + i*step_nb + (5*32) + j
-let carry42 i j = begin_round + i*step_nb + (6*32) + j
-let sum4 i j = begin_round + i*step_nb + (7*32) + j
+(*addition de a,f , k et snput*)
+let carry41 s i = var_index carry41_nb s i
+let carry42 s i = var_index carry42_nb s i
+let sum4 s i = var_index sum4_nb s i
 
-let carry41_pos i j = Lit(Pos(carry41 i j))
-let carry41_neg i j = Lit(Neg(carry41 i j))
-let carry42_pos i j = Lit(Pos(carry42 i j))
-let carry42_neg i j = Lit(Neg(carry42 i j))
-let sum4_pos i j = Lit(Pos(sum4 i j))
-let sum4_neg i j = Lit(Neg(sum4 i j))
 
 (*addition de b et du left_rotate*)
-let carry_lr i j = begin_round + i*step_nb + (8*32) + j
-let carry_lr_pos i j = Lit(Pos(carry_lr i j))
-let carry_lr_neg i j = Lit(Neg(carry_lr i j))
-(*let sum_lr i j = begin_round + i*step_nb + (8*32) + j inutile, dirrectement dans bi+1*)
+let carry_lr s i = var_index carry_lr_nb s i
+(*let sum_lr s i = begin_round + s*step_nb + (8*32) + i inutile, dirrectement dans bi+1*)
 
 (* Formule pour f*)
 let f s = 
   let formula_f = ref (Const true) in 
-  true
- (* for i = 0 to 31 do 
-    formula_f := And(!formula_f, Or(And(Lit(Pos(b s i), Lit(Pos(c s i))),And()))*)
-
+  for i = 0 to 31 do 
+    formula_f := And(!formula_f,
+		     Imply(
+			 Or(
+			     And(pos (b s i), pos (c s i)),
+			     And(neg (b s i), pos (d s i))
+		       ), pos(non_lin s i)
+		    ))
+  done;
+  !formula_f
 
 (*** Main function 
 * Digest : tableau de 128 bits ***)
