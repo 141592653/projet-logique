@@ -130,9 +130,24 @@ let left_rotate a n =
   done;
   res
 
-(*** Main function ***)	  
-let compute input =
+(******************** Fonctions de test *******************)
+
+let test_f input = 
   let input_32 = convert_input_to_32 input in 
+  let digest = Array.make_matrix 4 32 true in 
+  digest.(0) <- f_32 input_32.(1) input_32.(2) input_32.(3);
+  convert432_to_digest digest
+
+let test_aff input = 
+  let input_32 = convert_input_to_32 input in 
+  let digest = Array.make_matrix 4 32 true in 
+  digest.(0) <- f_32 input_32.(1) input_32.(2) input_32.(3);
+  convert432_to_digest digest
+
+(*ici un seul round*)
+let md5 input = 
+let input_32 = convert_input_to_32 input in 
+  let digest = Array.make_matrix 4 32 true in 
   let a = ref a0 and b = ref b0 and c = ref c0 and d = ref d0 in 
   for i = 0 to 15 do 
     let round = i / 16 in 
@@ -144,11 +159,16 @@ let compute input =
     a:= temp
   done;
 
-  let digest = Array.make_matrix 4 32 true in 
+  
   
   digest.(0) <- add_32 !a a0; digest.(1) <- add_32 !b b0;
   digest.(2) <- add_32 !c c0; digest.(3) <- add_32 !d d0;
   convert432_to_digest digest
+
+
+(*** Main function ***)	  
+let compute input =
+  test_f input
 
 
     
