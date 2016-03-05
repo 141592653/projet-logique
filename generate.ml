@@ -78,7 +78,7 @@ let test = ref false
 (*var index permet de renvoyer le numéro de la première variable d'un groupe de 32 bits. *)
 let var_index step_index s = 
   if !test && step_index <> 4 then 
-    input step_index 
+    input (step_index + 1)
   else
     begin_round + s*step_nb + (step_index * 32) 
 
@@ -209,9 +209,10 @@ let formula_add4_bool addend1 addend2 addend3 add_arr4 carry1 carry2 result i n 
   
 	     
   
+(*formula_add4_bool (a s) (non_lin s) (input (choice round s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) i j*)
 
 (*non testé*)
-let add4 s = 
+let add4 addend1 addend2 addend3 add_arr4 carry1 carry2 result s = 
   (*initialisation des retenues *)
   let round = s / 16 in 
   let formula_add4 = ref (And(Equiv ( pos (carry41 s), Const false),
@@ -219,10 +220,23 @@ let add4 s =
   in
   for i = 0 to 31 do 
     for j = 0 to 7 do 
-      formula_add4 := And(formula_add4_bool (a s) (non_lin s) (input (choice round s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) i j, !formula_add4)
+      formula_add4 := And(formula_add4_bool addend1 addend2 addend3 add_arr4 carry1 carry2 result i j, !formula_add4)
     done
   done;
   !formula_add4
+
+let bound_digest_test_add digest = 
+  let formula_bound = ref (Const true) in 
+  for i = 0 to 31 do 
+    formula_bound := And (!formula_bound,
+			  Equiv ( pos (161 + i), Const(digest.(i))) )
+  done;
+  !formula_bound
+
+let test_add digest = 
+  test := true;
+  formulaeToCnf (And(bound_digest_test_dd digest, add4 1 33 65 vectK.(s) 97 129 161)) 
+  
 
 (*** Main function 
      * Digest : tableau de 128 bits ***)
