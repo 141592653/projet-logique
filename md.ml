@@ -14,7 +14,7 @@
    - each step consume a word of the input (not linear !)
    - can be seen as 64 steps such that non-linear functions (i.e., F,G,H,I), and
    parts of inputs that are consumed depend on the current step
-*)
+ *)
 
 open Param
 open Data
@@ -24,7 +24,7 @@ open Printf
 r -> vectS dans data.ml
 k -> vectK dans data.ml
 h0,h1,h2,h3 -> a0,b0,c0,d0 dans data.ml
-*)
+ *)
 
 let xor b1 b2 = match (b1,b2) with
   |(true,true)|(false,false) -> false
@@ -48,23 +48,23 @@ let f_32 b c d  =
   ret
 
 let g_32 b c d = 
-let ret = Array.make 32 false in 
+  let ret = Array.make 32 false in 
   for i = 0 to 31 do 
     ret.(i) <- (b.(i) && d.(i)) || (c.(i) && not d.(i))
   done;
   ret
 let h_32 b c d = 
-let ret = Array.make 32 false in 
+  let ret = Array.make 32 false in 
   for i = 0 to 31 do 
     ret.(i) <- xor b.(i) (xor c.(i) d.(i))
   done;
   ret
 let i_32 b c d = 
-let ret = Array.make 32 false in 
+  let ret = Array.make 32 false in 
   for i = 0 to 31 do 
     ret.(i) <- xor c.(i) (b.(i)|| not d.(i))
   done;
-ret
+  ret
 
 (*renvoie la fonction non linéaire associée au round r*)
 let non_linear r = 
@@ -140,13 +140,12 @@ let test_f input =
 
 let test_aff input = 
   let input_32 = convert_input_to_32 input in 
-  let digest = Array.make_matrix 4 32 true in 
-  digest.(0) <- f_32 input_32.(1) input_32.(2) input_32.(3);
+  let digest = Array.sub input_32 0 4 in 
   convert432_to_digest digest
 
 (*ici un seul round*)
 let md5 input = 
-let input_32 = convert_input_to_32 input in 
+  let input_32 = convert_input_to_32 input in 
   let digest = Array.make_matrix 4 32 true in 
   let a = ref a0 and b = ref b0 and c = ref c0 and d = ref d0 in 
   for i = 0 to 15 do 
@@ -158,8 +157,6 @@ let input_32 = convert_input_to_32 input in
     b:= add_32 !b (left_rotate (add_32 (add_32 !a f ) (add_32 vectK.(i) input_32.(choice round i))) vectS.(i)) ;
     a:= temp
   done;
-
-  
   
   digest.(0) <- add_32 !a a0; digest.(1) <- add_32 !b b0;
   digest.(2) <- add_32 !c c0; digest.(3) <- add_32 !d d0;
@@ -171,8 +168,8 @@ let compute input =
   test_f input
 
 
-    
-(* WEAK HASH let d = Array.make 128 false in 
+	 
+	 (* WEAK HASH let d = Array.make 128 false in 
    for i = 0 to 10 do 
    d.(i) <- xor (xor d.(i+10) input.((i*13) mod 512)) (xor input.((i*14 + 1) mod 512) input.((i*15 + 2) mod 512)) 
    done;

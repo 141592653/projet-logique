@@ -10,15 +10,38 @@ open Param
 open Printf
 open Formula
 open Data
-open Md
+
+(*ce serait mieux de faire un open mais ça marche pas...*)
+(*choix du mot*)
+let choice1 i =  i
+let choice2 i =  (5*i + 1) mod 16
+let choice3 i =  (3*i + 5) mod 16
+let choice4 i =  (7*i) mod 16
+
+(*renvoie la fonction de choix du mot de 32 bits dans input associée au round r*)
+let choice r = 
+  match r with 
+  |0 -> choice1
+  |1 -> choice2
+  |2 -> choice3
+  |3 -> choice4
+  |_ -> failwith "Round supérieur à 4"
+
 
 (* Permet de transformer une liste de formules en la conjonction des formules correspondantes *)
 let rec  list_to_formula l = match l with 
   |[] -> Const(true)
   |f::q -> And(f,list_to_formula q)
 
+(*transforme un entier en litéral*)
 let pos n = Lit(Pos n)
 let neg n = Lit(Neg n)
+(*transforme un entier et un booléen en littéral*)
+let lit n b = 
+  if b then 
+    pos n
+  else
+    neg n
 
 (*Variables de 1 à 512 : input*)
 let input i j = 1 + i*32 + j
@@ -40,11 +63,11 @@ let carry42_nb= 6
 let sum4_nb= 7
 let carry_lr_nb= 8
 
-let test = true
+let test = ref true
 
 (* permet de donner le numéro de la variable*)
 let var_index step_index s i = 
-  if test && step_index <> 4 then 
+  if !test && step_index <> 4 then 
     input step_index i
   else
     begin_round + s*step_nb + (step_index * 32) + i
@@ -101,7 +124,7 @@ let test_f digest =
   formulaeToCnf (And(bound_digest_test_f digest,f 0)) 
 
 
-(************ Affectations ****************)
+(** ******************************* Affectations *********************************)
 (* non testé *)
 let affectations s =
   let formula_aff = ref (Const true) in 
@@ -132,25 +155,61 @@ let bound_digest_test_aff digest =
 let test_aff digest = 
   formulaeToCnf (And(bound_digest_test_aff digest,affectations 0)) 
 
-let add_rotate s = 
+(** ****************************** Addition - rotation ***************************)
+(*non testé*)
+(* ici, dep_rot est le numéro de la première variable du mot 32 bits qui subit la rotation et dep_b est le deuxième mot 32 bits qui lui est additionné*)
+let add_rotate dep_rot  = 
   formulaeToCnf (Const(true))
 
+(** ***************************** Addition des 4 mots ****************************)
+
+
+
+(*compte le nombre de valeur true d'un tableau de booléens*)
+let count_true bool_arr = 
+  let fold_func n b = if b then n + 1 else n in 
+  Array.fold_left fold_func 0 bool_arr
+
+(*ici, n appartient à [0,7], il représente les 8 combinaisons de booléens possiblespour les 3 variables additionnées*)
+let formula_add4_bool s i n = 
+
+  let n_ref = ref n in 
+  let bool_arr = Array.make 4 false in
+  for i = 0 to 2 do (*conversion de n en binaire*)
+    bool_arr.(i) <- if !n_ref mod 2 = 0 then false else true ;
+    n_ref := !n_ref / 2
+  done; 
+  bool_arr.(3) <- vectK.(s).(i);
+(* le nombre de booléens à la valeur true caractérise exactement le résultat de la somme et les deux retenues*)
+  let nb_true = count_true bool_arr in 
+  let carry41_bool = nb_true >= 2 and carry42_bool = nb_true = 4 in 
+  let sum4_result = if nb_true mod 2 = 0 then false else true in 
+  Equiv(
+      list_to_formula [
+	  lit (a s i) bool_arr.(0);
+	  lit (non_lin s i) bool_arr.(1); 
+	  lit (input (choice (s/16) s) i) bool_arr.(2)] ,
+      list_to_formula [
+	  lit (carry41 s i) carry41_bool;
+	  lit (carry42 s i) carry42_bool;
+	  lit (sum4    s i) sum4_result
+    ])
+  
+	     
+  
+
+(*non testé*)
 let add4 s = 
-  let round = s / 16 in 
   (*initialisation des retenues *)
   let formula_add4 = ref (And(Equiv ( pos (carry41 s 0), Const false),
 			      Equiv ( pos (carry42 s 0), Const false))) 
   in
   for i = 0 to 31 do 
-    let formulae = [
-      Equiv(list_to_formula [neg (a i s); neg (non_lin i s); Equiv(Const(vectK.(s).(i)), Const(false)) ; Equiv (Const(input (choice round s) i),false)] , list_to_formula [neg (carry41 s (i+1)); neg (carry42 s (i+1)); neg (sum4 s (i+1))])
-    ] in 
-    formula_add4 := And(list_to_formula formulae, !formula_add4)
+    for j = 0 to 7 do 
+      formula_add4 := And(formula_add4_bool s i j, !formula_add4)
+    done
   done;
   !formula_add4
-  (*initialisa
-  for i = 0 to 31 do
-  *)
 
 (*** Main function 
      * Digest : tableau de 128 bits ***)
