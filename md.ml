@@ -143,6 +143,12 @@ let test_aff input =
   let digest = Array.sub input_32 0 4 in 
   convert432_to_digest digest
 
+let test_add input = 
+  let input_32 = convert_input_to_32 input in 
+  let digest = Array.make_matrix 4 32 true in 
+  digest.(0) <-add_32 (add_32 input_32.(0) input_32.(1)) (add_32 vectK.(0) input_32.(2));
+   convert432_to_digest digest
+
 (*ici un seul round*)
 let md5 input = 
   let input_32 = convert_input_to_32 input in 
@@ -165,7 +171,7 @@ let md5 input =
 
 (*** Main function ***)	  
 let compute input =
-  test_f input
+  test_add input
 
 
 	 

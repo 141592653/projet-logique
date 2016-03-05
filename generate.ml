@@ -40,7 +40,18 @@ let choice r =
 (* Permet de transformer une liste de formules en la conjonction des formules correspondantes *)
 let rec  list_to_formula l = match l with 
   |[] -> Const(true)
+  |[x] -> x
   |f::q -> And(f,list_to_formula q)
+
+(* Conversion en binaire, little endian, size est le nombre de bit que l'on souhaite avoir. Attention, si le nombre est trop grand, il sera tronqué.*)
+let int_to_bin n size = 
+  let n_ref = ref n in 
+  let bool_arr = Array.make size false in 
+  for i = 0 to size -1 do 
+    bool_arr.(i) <- if !n_ref mod 2 = 0 then false else true;
+    n_ref := !n_ref / 2
+  done;
+  bool_arr
 
 (*transforme un entier en litéral*)
 let pos n = Lit(Pos n)
@@ -179,47 +190,60 @@ let count_true bool_arr =
   let fold_func n b = if b then n + 1 else n in 
   Array.fold_left fold_func 0 bool_arr
 
-(*addendi est le ième terme de l'addition. add_arr4 est un tableau de boléen dont on connait la valeur (en pratique, c'est vectK.s) 
+(*addendi est le ième terme de l'addition. 
+add_arr4 est un tableau de boléen dont on connait la valeur (en pratique, c'est vectK.s) pour les tests, on peut le mettre à 0. 
 carry ;: retenues
 result : résultat de l'addition
-n appartient à [0,7], il représente les 8 combinaisons de booléens possibles pour les 3 variables additionnées*)
+n appartient à [0,31], il représente les 5 bits associés aux trois termes et aux deux retenues *)
 let formula_add4_bool addend1 addend2 addend3 add_arr4 carry1 carry2 result i n = 
 
   let n_ref = ref n in 
-  let bool_arr = Array.make 4 false in
-  for i = 0 to 2 do (*conversion de n en binaire*)
-    bool_arr.(i) <- if !n_ref mod 2 = 0 then false else true ;
-    n_ref := !n_ref / 2
-  done; 
-  bool_arr.(3) <- add_arr4.(i);
+  let bool_arr = int_to_bin n 6 in  (*conversion de n en binaire avec une case de trop*)    
+  bool_arr.(5) <- add_arr4.(i);
 (* le nombre de booléens à la valeur true caractérise exactement le résultat de la somme et les deux retenues*)
   let nb_true = count_true bool_arr in 
-  let carry41_bool = nb_true >= 2 and carry42_bool = nb_true = 4 in 
-  let sum4_result = if nb_true mod 2 = 0 then false else true in 
-  Equiv(
+  let sum_res = int_to_bin nb_true 3 in  
+  
+  Imply(
       list_to_formula [
 	  lit (addend1 + i) bool_arr.(0);
 	  lit (addend2 + i) bool_arr.(1); 
-	  lit (addend3 + i) bool_arr.(2)] ,
-      list_to_formula [
-	  lit (carry1 + i) carry41_bool;
-	  lit (carry2 + i) carry42_bool;
-	  lit (result + i) sum4_result
-    ])
+	  lit (addend3 + i) bool_arr.(2);
+	  lit (carry1 + i) bool_arr.(3);
+	  lit (carry2 + i) bool_arr.(4)
+	] ,
+
+      if i = 31 then
+	lit (result + i)  sum_res.(0)
+      else if i = 30 then
+	list_to_formula [
+	    lit (result + i)     sum_res.(0);
+	    lit (carry1 + i + 1) sum_res.(1);
+	  ]
+      else
+	list_to_formula [
+	    lit (result + i)     sum_res.(0);
+	    lit (carry1 + i + 1) sum_res.(1);
+	    lit (carry2 + i + 2) sum_res.(2)
+	  ]
+    )
   
 	     
   
 (*formula_add4_bool (a s) (non_lin s) (input (choice round s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) i j*)
 
-(*non testé*)
-let add4 addend1 addend2 addend3 add_arr4 carry1 carry2 result s = 
+(*testée avec 0-digest, honest-digest, vectK.(0), falses, et trues : OK*)
+let add4 addend1 addend2 addend3 add_arr4 carry1 carry2 result  = 
   (*initialisation des retenues *)
-  let round = s / 16 in 
-  let formula_add4 = ref (And(Equiv ( pos (carry41 s), Const false),
-			      Equiv ( pos (carry42 s), Const false))) 
+  let formula_add4 = ref (list_to_formula [
+			      Equiv ( pos carry1, Const false);
+			      Equiv ( pos carry2, Const false);
+			      Equiv ( pos (carry2 + 1), Const false)
+			    ]
+			 ) 
   in
   for i = 0 to 31 do 
-    for j = 0 to 7 do 
+    for j = 0 to 31 do 
       formula_add4 := And(formula_add4_bool addend1 addend2 addend3 add_arr4 carry1 carry2 result i j, !formula_add4)
     done
   done;
@@ -229,19 +253,22 @@ let bound_digest_test_add digest =
   let formula_bound = ref (Const true) in 
   for i = 0 to 31 do 
     formula_bound := And (!formula_bound,
-			  Equiv ( pos (161 + i), Const(digest.(i))) )
+			  Equiv ( pos (481 + i), Const(digest.(i))) )
   done;
   !formula_bound
 
+(*vectK.(0) = 0xd76aa478*)
+(*Pour tester la fonction add : test_add dans generate et dans md puis vérifier que le premier octet du digest reste le meme.*)
 let test_add digest = 
-  test := true;
-  formulaeToCnf (And(bound_digest_test_dd digest, add4 1 33 65 vectK.(s) 97 129 161)) 
+  formulaeToCnf (And(bound_digest_test_add digest, add4 1 33 65 vectK.(0) 97 129 481))
+
+
   
 
 (*** Main function 
      * Digest : tableau de 128 bits ***)
 let genCNF digest = 
-  test_f digest
+  test_add digest
 
 
 
