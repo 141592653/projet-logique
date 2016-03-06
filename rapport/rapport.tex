@@ -1,0 +1,57 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[francais]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{tikz}
+\usepackage{graphicx}
+\usepackage[left=3cm,right=3cm,top=3cm,bottom=3cm]{geometry}
+
+\title{Rapport du projet de logique}
+\author{Julien Rixte}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+L'objectif de ce projet était de calculer l'antécédent par la fonction de hachage MD5 d'un digest quelconque. Cet antécédent devait également satisfaire certaines contraintes. 
+Dans ce rapport, je décrirai dans un premier temps la démarche que j'ai suivie. Puis, j'expliquerai la manière dont mon code est structuré. Enfin, je proposerai des améliorations possibles pour l'implémentation que j'ai écrite.
+
+\section{Démarche}
+Comme suggéré dans le sujet du projet, j'ai commencé par écrire les fonctions de manipulation de formules logiques. La principale fonction était la conversion d'une formule quelconque en formule en forme normale conjonctive. Bien que cette partie ne présente pas de réelle difficulté, il était fondamental de la tester correctement car je me suis rendu compte par la suite qu'il était difficile de déboguer le code lors de l'inversion de hachage. \par
+
+Mes tests étaient d'ailleurs insuffisants car en inversant WeakHash, je me suis rendu compte, après une longue phase de débogage que la fonction de conversion n'était pas correcte. \par
+
+Le temps que j'ai perdu sur cet erreur n'aura pas été totalement inutile car je me suis forcé par la suite à tester toutes les fonctions que j'écrivais, en particulier au moment de l'inversion de MD5. Le fait d'avoir à écrire ces tests m'a d'ailleurs obligé à écrire des fonctions locales sur des variables quelconques (et non uniquement sur les variables pour lesquelles elles sont destinées), ce qui les rend bien plus modulaires.
+
+\section{Structure du code}
+\subsection{Organisation des variables}
+Le premier problème qui se posait était la manière d'organiser les variables. Comme le bootstrap le suggéré, mes variables sont simplement représentées par un entier. \par
+Tout d'abord, les variables sont organisées en groupes de 32 bits. Un groupe de 32 bits est représenté par l'entier n correspondant à la première variable du groupe. Ainsi, $n + i$ donne la $i^{ème}$ variable du groupe représenté par n. \par
+Ensuite, ces groupes (à l'exception des variables de l'input et des quatre additions finales de MD5) sont organisés en steps, chaque step représentant les variables nécessaires à l'inversion de ce step.
+\newline
+
+\begin{tabular}{|c|c|c|c|c|c|c|}
+   \hline
+   Input (16 blocs) & $Step_0$ (9 blocs) & $Step_1$ & $Step_2$ & ... & $Step_k$ & Dernières additions (8 blocs) \\
+   \hline
+\end{tabular}
+\newline
+\par
+Chaque step $s$ est composé de 9 blocs : 
+\begin{itemize}
+\item $a_s,b_s,c_s,d_s$ sont les quatre blocs qui sont calculés par la boucle principale de MD5
+\item $non\_lin_s$ est le résultat de la fonction non linéaire
+\item $carry41_s, carry42_s$ sont les deux retenues nécessaires à l'addition de quatre blocs.
+\item $sum4$ est le résultat de l'addition des quatre blocs
+\item $carry_lr$ est la retenue pour l'opération d'addition-rotation. Il est à noter que l'on a pas besoin de variables représentant le résultat de l'addition-rotation car celui-ci sera stocké dans $b_{s+1}$
+\end{itemize}
+
+
+\section{Améliorations}
+
+\section{Conclusion}
+
+
+
+
+\end{document}

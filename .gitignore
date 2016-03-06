@@ -4,3 +4,6 @@
 hackMD
 md5
 minisat
+*.aux
+*.log
+*.gz
