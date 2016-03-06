@@ -53,6 +53,11 @@ let int_to_bin n size =
   done;
   bool_arr
 
+(*compte le nombre de valeur true d'un tableau de booléens*)
+let count_true bool_arr = 
+  let fold_func n b = if b then n + 1 else n in 
+  Array.fold_left fold_func 0 bool_arr
+
 (*transforme un entier en litéral*)
 let pos n = Lit(Pos n)
 let neg n = Lit(Neg n)
@@ -71,7 +76,18 @@ let input s = 1 + s*32
 let begin_round = 513
 
 (*nombre de variables dans un step*)
-let step_nb = 9 * 32
+let var_per_step = 9 * 32
+(* on met nb_steps +1 à cause de a0, b0, c0, d0 qui en quelque sortent comptent pour un step*)
+let end_round nb_steps = begin_round + (nb_steps + 1) * var_per_step
+
+let last_carry_a nb_steps = end_round nb_steps
+let last_carry_b nb_steps = end_round nb_steps + 32
+let last_carry_c nb_steps = end_round nb_steps + 64
+let last_carry_d nb_steps = end_round nb_steps + 128
+let last_sum_a nb_steps = last_carry_d nb_steps + 32
+let last_sum_b nb_steps = last_carry_d nb_steps + 64
+let last_sum_c nb_steps = last_carry_d nb_steps + 128
+let last_sum_d nb_steps = last_carry_d nb_steps + 160
 
 (*indice dans le step des différentes variables. Les variables d'un step sont rangées par groupe de 32 variables. Ici, le premier groupe correspond aux 32 bits de a, le second ceux de b, etc. *)
 let a_nb= 0
@@ -84,14 +100,10 @@ let carry42_nb= 6
 let sum4_nb= 7
 let carry_lr_nb= 8
 
-let test = ref false
 
 (*var index permet de renvoyer le numéro de la première variable d'un groupe de 32 bits. *)
 let var_index step_index s = 
-  if !test && step_index <> 4 then 
-    input (step_index + 1)
-  else
-    begin_round + s*step_nb + (step_index * 32) 
+    begin_round + s*var_per_step + (step_index * 32) 
 
 (*as , bs ,cs, ds avec s le numéro du step*)
 let a s = var_index a_nb s
@@ -112,6 +124,8 @@ let sum4 s = var_index sum4_nb s
 let carry_lr s = var_index carry_lr_nb s
 (*let sum_lr s i = begin_round + s*step_nb + (8*32) + i inutile, dirrectement dans bi+1*)
 
+
+(** ***********************Fonctions non linéraires *********************************)
 (* Formule pour f, testée : ok. b_start, c_start et d_start sont les première variaables des groupes de 32 variables b,c et d.*)
 let f b_start c_start d_start non_lin_start = 
   let formula_f = ref (Const true) in 
@@ -137,13 +151,12 @@ let f b_start c_start d_start non_lin_start =
 let bound_digest_test_f digest = 
   let formula_bound = ref (Const true) in 
   for i = 0 to 31 do 
-    formula_bound := And (!formula_bound, Equiv (pos (non_lin 0 + i), Const(digest.(i))) )
+    formula_bound := And (!formula_bound, Equiv (pos (97 + i), Const(digest.(i))) )
   done;
   !formula_bound
 
 let test_f digest =
-  test := true;
-  formulaeToCnf (And(bound_digest_test_f digest,f (b 0) (c 0) (d 0) (non_lin 0))) 
+  formulaeToCnf (And(bound_digest_test_f digest,f 1 33 65 97)) 
 
 
 (** ******************************* Affectations *********************************)
@@ -172,23 +185,65 @@ let bound_digest_test_aff digest =
   !formula_bound
 
 let test_aff digest = 
-  test := true;
   formulaeToCnf (And(bound_digest_test_aff digest,affectation (a 0) (b 0))) 
 
 (** ****************************** Addition - rotation ***************************)
+
+let modz a b = 
+  let c = a mod b in 
+  if c >= 0 then 
+    c 
+  else
+    c + b
+
+let formula_add_rot_bool addend1 addend2_rot carry result i r n =
+  let bool_arr = int_to_bin n 3 in
+  (* le nombre de booléens à la valeur true caractérise exactement le résultat de la somme et les deux retenues*)
+  let nb_true = count_true bool_arr in 
+  let sum_res = int_to_bin nb_true 2 in 
+  Imply(list_to_formula [
+	    lit (addend1 + i) bool_arr.(0);
+	    lit (addend2_rot + (modz (i - r) 32)) bool_arr.(1) ;
+	    lit (carry + i) bool_arr.(2)
+	  ],
+	if i = 31 then
+	  lit (result + i) sum_res.(0)
+	else
+	  list_to_formula [
+	      lit (result + i) sum_res.(0);
+	      lit (carry + i + 1) sum_res.(1)
+	    ]
+       )
+
 (*non testé*)
 (* ici, dep_rot est le numéro de la première variable du mot 32 bits qui subit la rotation et dep_b est le deuxième mot 32 bits qui lui est additionné*)
-let add_rotate dep_rot  = 
-  formulaeToCnf (Const(true))
+let add_rotate addend1 addend2_rot carry result r  = 
+  let formula_rot = ref (Equiv ( pos carry, Const false)) in 
+  
+  for i = 0 to 31 do 
+    for j = 0 to 8 do
+      formula_rot := And (!formula_rot , formula_add_rot_bool addend1 addend2_rot carry result i r j)
+    done;
+  done;
+  !formula_rot
+
+(*Remarque : on utilise la meme fonction pour le test da l'addition de 4 mots de 32 bits*)
+let bound_digest_test_add digest = 
+  let formula_bound = ref (Const true) in 
+  for i = 0 to 31 do 
+    formula_bound := And (!formula_bound,
+			  Equiv ( pos (481 + i), Const(digest.(i))) )
+  done;
+  !formula_bound
+
+(*vectK.(0) = 0xd76aa478*)
+(*Pour tester la fonction add : test_add dans generate et dans md puis vérifier que le premier octet du digest reste le meme.*)
+let test_add_rotate digest = 
+  formulaeToCnf (And(bound_digest_test_add digest, add_rotate 1 33 65 481 3))
+
 
 (** ***************************** Addition des 4 mots ****************************)
 
-
-
-(*compte le nombre de valeur true d'un tableau de booléens*)
-let count_true bool_arr = 
-  let fold_func n b = if b then n + 1 else n in 
-  Array.fold_left fold_func 0 bool_arr
 
 (*addendi est le ième terme de l'addition. 
 add_arr4 est un tableau de boléen dont on connait la valeur (en pratique, c'est vectK.s) pour les tests, on peut le mettre à 0. 
@@ -196,8 +251,6 @@ carry ;: retenues
 result : résultat de l'addition
 n appartient à [0,31], il représente les 5 bits associés aux trois termes et aux deux retenues *)
 let formula_add4_bool addend1 addend2 addend3 add_arr4 carry1 carry2 result i n = 
-
-  let n_ref = ref n in 
   let bool_arr = int_to_bin n 6 in  (*conversion de n en binaire avec une case de trop*)    
   bool_arr.(5) <- add_arr4.(i);
 (* le nombre de booléens à la valeur true caractérise exactement le résultat de la somme et les deux retenues*)
@@ -229,8 +282,7 @@ let formula_add4_bool addend1 addend2 addend3 add_arr4 carry1 carry2 result i n 
     )
   
 	     
-  
-(*formula_add4_bool (a s) (non_lin s) (input (choice round s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) i j*)
+
 
 (*testée avec 0-digest, honest-digest, vectK.(0), falses, et trues : OK*)
 let add4 addend1 addend2 addend3 add_arr4 carry1 carry2 result  = 
@@ -249,13 +301,6 @@ let add4 addend1 addend2 addend3 add_arr4 carry1 carry2 result  =
   done;
   !formula_add4
 
-let bound_digest_test_add digest = 
-  let formula_bound = ref (Const true) in 
-  for i = 0 to 31 do 
-    formula_bound := And (!formula_bound,
-			  Equiv ( pos (481 + i), Const(digest.(i))) )
-  done;
-  !formula_bound
 
 (*vectK.(0) = 0xd76aa478*)
 (*Pour tester la fonction add : test_add dans generate et dans md puis vérifier que le premier octet du digest reste le meme.*)
@@ -263,15 +308,58 @@ let test_add digest =
   formulaeToCnf (And(bound_digest_test_add digest, add4 1 33 65 vectK.(0) 97 129 481))
 
 
+(** **************************** Initialisation ******************************* **)
+let initialize digest nb_steps = 
+   let init_formula = ref (Const true) in 
+   for i = 0 to 31 do 
+    init_formula := list_to_formula [
+			!init_formula;
+			 Equiv ( pos (a 0 + i), Const(a0.(i)));
+			 Equiv ( pos (b 0 + i), Const(b0.(i)));	
+			 Equiv ( pos (c 0 + i), Const(c0.(i)));
+			 Equiv ( pos (d 0 + i), Const(d0.(i)));
+
+			 Equiv ( pos (last_sum_a nb_steps + i), Const digest.(i));
+			 Equiv ( pos (last_sum_b nb_steps + i), Const digest.(i + 32));	
+			 Equiv ( pos (last_sum_c nb_steps + i), Const digest.(i + 64));
+			 Equiv ( pos (last_sum_d nb_steps + i), Const digest.(i + 96))
+		      ]
+   done;
+  !init_formula
+
+
   
+(*formula_add4_bool (a s) (non_lin s) (input (choice round s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) i j*)
+
+let inverse_md5 digest nb_steps = 
+  let big_formula = ref (initialize digest nb_steps) in  
+  for s = 0 to nb_steps - 1 do
+    let round = s / 16 in
+    big_formula := 
+      list_to_formula [
+	  !big_formula;
+	  affectation (d (s+1)) (c s);
+	  affectation (c (s+1)) (b s);
+	  affectation (a (s+1)) (d s);
+	  f (b s) (c s) (d s) (non_lin s);
+	  add_rotate (b s) (sum4 s) (carry_lr s) (b (s+1)) vectS.(s);
+	  add4 (a s) (non_lin s) (input (choice round s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) 
+	]    
+  done;
+  big_formula := 
+      list_to_formula [
+	  !big_formula;
+	  add_rotate (a nb_steps) (a 0) (last_carry_a nb_steps) (last_sum_a nb_steps) 0;
+	  add_rotate (b nb_steps) (b 0) (last_carry_b nb_steps) (last_sum_b nb_steps) 0;
+	  add_rotate (c nb_steps) (c 0) (last_carry_c nb_steps) (last_sum_c nb_steps) 0;
+	  add_rotate (d nb_steps) (d 0) (last_carry_d nb_steps) (last_sum_d nb_steps) 0;
+	] ;   
+  formulaeToCnf !big_formula
 
 (*** Main function 
      * Digest : tableau de 128 bits ***)
 let genCNF digest = 
-  test_add digest
-
-
-
+  inverse_md5 digest 16
 
 
 (*WEAK HASH : let etape i = 

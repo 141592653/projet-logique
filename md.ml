@@ -122,11 +122,18 @@ let add_32 a b =
   done;
   res
 
+let modz a b = 
+  let c = a mod b in 
+  if c >= 0 then 
+    c 
+  else
+    -c
+
 (* rotation vers la gauche en little endian*)
 let left_rotate a n = 
   let res = Array.make 32 false in
   for i = 0 to 31 do 
-    res.((i+n) mod 32) <- a.(i)
+    res.(modz (i+n) 32) <- a.(i)
   done;
   res
 
@@ -143,6 +150,12 @@ let test_aff input =
   let digest = Array.sub input_32 0 4 in 
   convert432_to_digest digest
 
+let test_add_rotate input = 
+  let input_32 = convert_input_to_32 input in 
+  let digest = Array.make_matrix 4 32 true in 
+  digest.(0) <- add_32 input_32.(0) (left_rotate input_32.(1) 3);
+  convert432_to_digest digest
+
 let test_add input = 
   let input_32 = convert_input_to_32 input in 
   let digest = Array.make_matrix 4 32 true in 
@@ -150,17 +163,17 @@ let test_add input =
    convert432_to_digest digest
 
 (*ici un seul round*)
-let md5 input = 
+let md5 input nb_steps = 
   let input_32 = convert_input_to_32 input in 
   let digest = Array.make_matrix 4 32 true in 
   let a = ref a0 and b = ref b0 and c = ref c0 and d = ref d0 in 
-  for i = 0 to 15 do 
-    let round = i / 16 in 
+  for s = 0 to nb_steps - 1 do 
+    let round = s / 16 in 
     let temp = Array.copy !d in 
     let f = non_linear round !b !c !d in 
     d:=!c;
     c:=!b;
-    b:= add_32 !b (left_rotate (add_32 (add_32 !a f ) (add_32 vectK.(i) input_32.(choice round i))) vectS.(i)) ;
+    b:= add_32 !b (left_rotate (add_32 (add_32 !a f ) (add_32 vectK.(s) input_32.(choice round s))) vectS.(s)) ;
     a:= temp
   done;
   
@@ -171,7 +184,7 @@ let md5 input =
 
 (*** Main function ***)	  
 let compute input =
-  test_add input
+  md5 input 16
 
 
 	 
