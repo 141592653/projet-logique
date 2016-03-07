@@ -232,7 +232,7 @@ let add_rotate addend1 addend2_rot carry result r  =
   let formula_rot = ref (Equiv ( pos carry, Const false)) in 
   
   for i = 0 to 31 do 
-    for j = 0 to 8 do
+    for j = 0 to 7 do
       formula_rot := And (!formula_rot , formula_add_rot_bool addend1 addend2_rot carry result i r j)
     done;
   done;
