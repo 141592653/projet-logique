@@ -17,7 +17,6 @@ open Data
    -inversion de la fonction non linéaire
    -addition de 4 mots de 32 bits
    -addition combiné à la rotation (ce qui permet de diminuer le nombre de clauses)
-
    Pour chacune de ces phases, j'ai écrit une fonction caml associée qui, pour prendre en paramètre un mot de 32 bits, reçoit le numéro de la première variable correpondant à ces 32 bits.*)
 
 (*ce serait mieux de faire un open mais ça marche pas...*)
@@ -73,21 +72,21 @@ let lit n b =
 let input s = 1 + s*32
 
 (*Première variable du round*)
-let begin_round = 513
+let begin_round = 609
 
 (*nombre de variables dans un step*)
 let var_per_step = 9 * 32
-(* on met nb_steps +1 à cause de a0, b0, c0, d0 qui en quelque sortent comptent pour un step*)
-let end_round nb_steps = begin_round + (nb_steps + 1) * var_per_step
+(* on met Param.steps +1 à cause de a0, b0, c0, d0 qui en quelque sortent comptent pour un step*)
+let end_round = begin_round + (!Param.steps + 1) * var_per_step
 
-let last_carry_a nb_steps = end_round nb_steps
-let last_carry_b nb_steps = end_round nb_steps + 32
-let last_carry_c nb_steps = end_round nb_steps + 64
-let last_carry_d nb_steps = end_round nb_steps + 128
-let last_sum_a nb_steps = last_carry_d nb_steps + 32
-let last_sum_b nb_steps = last_carry_d nb_steps + 64
-let last_sum_c nb_steps = last_carry_d nb_steps + 128
-let last_sum_d nb_steps = last_carry_d nb_steps + 160
+let last_carry_a = end_round 
+let last_carry_b = end_round + 32
+let last_carry_c = end_round + 64
+let last_carry_d = end_round + 128
+let last_sum_a = last_carry_d + 32
+let last_sum_b = last_carry_d + 64
+let last_sum_c = last_carry_d + 128
+let last_sum_d = last_carry_d + 160
 
 (*indice dans le step des différentes variables. Les variables d'un step sont rangées par groupe de 32 variables. Ici, le premier groupe correspond aux 32 bits de a, le second ceux de b, etc. *)
 let a_nb= 0
@@ -106,8 +105,20 @@ let var_index step_index s =
   begin_round + s*var_per_step + (step_index * 32) 
 
 (*as , bs ,cs, ds avec s le numéro du step*)
+
+let b s =  if s >= 0 then var_index b_nb s
+	  else
+	    match s with 
+	    (*)|0 -> 609*)
+	    |(-1) -> 567 (*d0*)
+	    |(-2)-> 535 (*c0*)
+	    |(-3)-> 513 (*a0*)
+
+(*let a s = b (s-3)
+let c s = b (s-1)
+let d s = b (s-2)*)
+
 let a s = var_index a_nb s
-let b s = var_index b_nb s
 let c s = var_index c_nb s
 let d s = var_index d_nb s
 
@@ -309,7 +320,7 @@ let test_add digest =
 
 
 (** **************************** Initialisation ******************************* **)
-let initialize digest nb_steps = 
+let initialize digest = 
   let init_formula = ref (Const true) in 
   for i = 0 to 31 do 
     init_formula := list_to_formula [
@@ -319,21 +330,19 @@ let initialize digest nb_steps =
       lit (c 0 + i) c0.(i);
       lit (d 0 + i) d0.(i);
 
-      lit (last_sum_a nb_steps + i) digest.(i);
-      lit (last_sum_b nb_steps + i) digest.(i + 32);	
-      lit (last_sum_c nb_steps + i) digest.(i + 64);
-      lit (last_sum_d nb_steps + i) digest.(i + 96)
+      lit (last_sum_a + i) digest.(i);
+      lit (last_sum_b + i) digest.(i + 32);	
+      lit (last_sum_c + i) digest.(i + 64);
+      lit (last_sum_d + i) digest.(i + 96)
     ]
   done;
   !init_formula
 
 
-    
-(*formula_add4_bool (a s) (non_lin s) (input (choice round s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) i j*)
 
-let inverse_md5 digest nb_steps = 
-  let big_formula = ref (initialize digest nb_steps) in  
-  for s = 0 to nb_steps - 1 do
+let inverse_md5 digest  = 
+  let big_formula = ref (initialize digest) in  
+  for s = 0 to !Param.steps - 1 do
     let round = s / 16 in
     big_formula := 
       list_to_formula [
@@ -349,10 +358,10 @@ let inverse_md5 digest nb_steps =
   big_formula := 
     list_to_formula [
       !big_formula;
-      add_rotate (a nb_steps) (a 0) (last_carry_a nb_steps) (last_sum_a nb_steps) 0;
-      add_rotate (b nb_steps) (b 0) (last_carry_b nb_steps) (last_sum_b nb_steps) 0;
-      add_rotate (c nb_steps) (c 0) (last_carry_c nb_steps) (last_sum_c nb_steps) 0;
-      add_rotate (d nb_steps) (d 0) (last_carry_d nb_steps) (last_sum_d nb_steps) 0;
+      add_rotate (a !Param.steps) (a 0) last_carry_a last_sum_a 0;
+      add_rotate (b !Param.steps) (b 0) last_carry_b last_sum_b 0;
+      add_rotate (c !Param.steps) (c 0) last_carry_c last_sum_c 0;
+      add_rotate (d !Param.steps) (d 0) last_carry_d last_sum_d 0;
     ] ;   
   let big_f = formulaeToCnf !big_formula in 
   big_f
@@ -360,7 +369,7 @@ let inverse_md5 digest nb_steps =
 (*** Main function 
      * Digest : tableau de 128 bits ***)
 let genCNF digest = 
-  inverse_md5 digest 2
+  inverse_md5 digest
 
 
 (*WEAK HASH : let etape i = 

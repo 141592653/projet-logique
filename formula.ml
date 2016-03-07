@@ -138,19 +138,22 @@ let nb_var_cnf cnf =
   !nb_var
 
 (************Affichage d'une clause ****************)
-let rec displayClause c = match c with
-  |[] -> ""
-  |[l] -> displayLit l
-  |l::q -> (displayLit l)^" "^(displayClause q)
-    
-(******************Affichage d'une formule cnf *******************)
-let rec displayCnf cnf = 
-  let rec cnfToDimacs_rec cnf = match cnf with 
+let displayClause c = 
+  (*let clause_str = List.map displayLit c in*)
+  let rec displayClause_rec c= match c with
     |[] -> ""
-    |[c] -> displayClause c ^ " 0\n"
-    |c::q -> displayClause c^ " 0\n"^(cnfToDimacs_rec q) in 
+    |[l] -> displayLit l
+    |l::q -> (displayLit l)^" "^(displayClause_rec q)
+  in
+  displayClause_rec c 
+  (*(String.concat " " clause_str)*)
 
-  "p cnf "^string_of_int (nb_var_cnf cnf)^" "^string_of_int (List.length cnf)^"\n"^cnfToDimacs_rec cnf
+(* les tests montrent que ma fonction de displayClause_rec est plus rapide que le concat. Par contre, la meme fonction pour displaycnf est catastrophique : on passe de 1,4 s pour 16 steps à plusieurs minutes.*)
+
+(******************Affichage d'une formule cnf *******************)
+let displayCnf cnf = 
+  let cnf_str = List.map displayClause cnf in 
+  (String.concat "" (["p cnf "; string_of_int (nb_var_cnf cnf); " " ; string_of_int (List.length cnf) ; "\n" ])) ^ (String.concat " 0\n" cnf_str)
 
       
 

@@ -184,7 +184,7 @@ let md5 input nb_steps =
 
 (*** Main function ***)	  
 let compute input =
-  md5 input 2
+  md5 input !Param.steps
 
 
 	 

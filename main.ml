@@ -89,12 +89,15 @@ let computeRes fn_input =
       log ~level:Low "Displaying CNF...";
       let cnf_display = Formula.displayCnf cnf in
       (* log ~level:Low (sprintf "CNF is \n%s" cnf_display); *)
+      Printf.printf "**************** Time to display cnf ********************* \n             %f sec \n" (Sys.time () -. beg_time);
 
       (* Write this in CNF file *)
       log (sprintf "Writing CNF in %s..." fn_cnf);
       let oc = open_out fn_cnf in
       Printf.fprintf oc  "%s\n" cnf_display;
       close_out oc;
+
+      Printf.printf "**************** Time before minisat ********************* \n             %f sec \n" (Sys.time () -. beg_time);
 
       (* Launch Sat-solver on CNF *)
       
@@ -118,7 +121,7 @@ let computeRes fn_input =
       close_in resc;
 
 
-        Printf.printf "**************** Time for minisat ********************* \n             %f sec \n" (Sys.time () -. beg_time);
+      Printf.printf "**************** Time after minisat ********************* \n             %f sec \n" (Sys.time () -. beg_time);
 
 
       (* Print the result (SAT?)*)
