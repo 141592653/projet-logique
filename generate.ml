@@ -325,10 +325,10 @@ let initialize digest =
   for i = 0 to 31 do 
     init_formula := list_to_formula [
       !init_formula;
-      lit (b (-3) + i) a0.(i);
+      lit (a 0 + i) a0.(i);
       lit (b 0 + i) b0.(i);
-      lit (b (-1) + i) c0.(i);
-      lit (d (-2) + i) d0.(i);
+      lit (c 0 + i) c0.(i);
+      lit (d 0 + i) d0.(i);
 
       lit (last_sum_a + i) digest.(i);
       lit (last_sum_b + i) digest.(i + 32);	
@@ -347,10 +347,10 @@ let inverse_md5 digest  =
     big_formula := 
       list_to_formula [
 	!big_formula;
-	(*affectation (d (s+1)) (c s);
+	affectation (d (s+1)) (c s);
 	affectation (c (s+1)) (b s);
-	affectation (a (s+1)) (d s);*)
-	f (b s) (b (s-1)) (b (s-2)) (non_lin s);
+	affectation (a (s+1)) (d s);
+	f (b s) (c s) (d s) (non_lin s);
 	add_rotate (b s) (sum4 s) (carry_lr s) (b (s+1)) vectS.(s);
 	add4 (a s) (non_lin s) (input (choice round s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) 
       ]    
@@ -358,10 +358,10 @@ let inverse_md5 digest  =
   big_formula := 
     list_to_formula [
       !big_formula;
-      add_rotate (b (!Param.steps-3)) (b (-3)) last_carry_a last_sum_a 0;
+      add_rotate (a !Param.steps) (a 0) last_carry_a last_sum_a 0;
       add_rotate (b !Param.steps) (b 0) last_carry_b last_sum_b 0;
-      add_rotate (b (!Param.steps-2)) (b (-2)) last_carry_c last_sum_c 0;
-      add_rotate (b (!Param.steps-1)) (b (-1)) last_carry_d last_sum_d 0;
+      add_rotate (c !Param.steps) (c 0) last_carry_c last_sum_c 0;
+      add_rotate (d !Param.steps) (d 0) last_carry_d last_sum_d 0;
     ] ;   
   let big_f = formulaeToCnf !big_formula in 
   big_f

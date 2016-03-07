@@ -153,7 +153,7 @@ let displayClause c =
 (******************Affichage d'une formule cnf *******************)
 let displayCnf cnf = 
   let cnf_str = List.map displayClause cnf in 
-  (String.concat "" (["p cnf "; string_of_int (nb_var_cnf cnf); " " ; string_of_int (List.length cnf) ; "\n" ])) ^ (String.concat " 0\n" cnf_str)
+  (String.concat "" (["p cnf "; string_of_int (nb_var_cnf cnf); " " ; string_of_int (List.length cnf) ; "\n" ])) ^ (String.concat " 0\n" cnf_str) ^ " 0\n"
 
       
 
