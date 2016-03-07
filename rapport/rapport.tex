@@ -25,8 +25,10 @@ Le temps que j'ai perdu sur cet erreur n'aura pas été totalement inutile car j
 
 \section{Structure du code}
 \subsection{Organisation des variables}
-Le premier problème qui se posait était la manière d'organiser les variables. Comme le bootstrap le suggéré, mes variables sont simplement représentées par un entier. \par
-Tout d'abord, les variables sont organisées en groupes de 32 bits. Un groupe de 32 bits est représenté par l'entier n correspondant à la première variable du groupe. Ainsi, $n + i$ donne la $i^{ème}$ variable du groupe représenté par n. \par
+Le premier problème qui se posait était la manière d'organiser les variables. Comme le bootstrap le suggéré, mes variables sont simplement représentées par un entier. 
+\par
+Tout d'abord, les variables sont organisées en groupes de 32 bits. Un groupe de 32 bits est représenté par l'entier n correspondant à la première variable du groupe. Ainsi, $n + i$ donne la $i^{ème}$ variable du groupe représenté par n. 
+\par
 Ensuite, ces groupes (à l'exception des variables de l'input et des quatre additions finales de MD5) sont organisés en steps, chaque step représentant les variables nécessaires à l'inversion de ce step.
 \newline
 
@@ -43,11 +45,39 @@ Chaque step $s$ est composé de 9 blocs :
 \item $non\_lin_s$ est le résultat de la fonction non linéaire
 \item $carry41_s, carry42_s$ sont les deux retenues nécessaires à l'addition de quatre blocs.
 \item $sum4$ est le résultat de l'addition des quatre blocs
-\item $carry_lr$ est la retenue pour l'opération d'addition-rotation. Il est à noter que l'on a pas besoin de variables représentant le résultat de l'addition-rotation car celui-ci sera stocké dans $b_{s+1}$
+\item $carry\_lr$ est la retenue pour l'opération d'addition-rotation. Il est à noter que l'on a pas besoin de variables représentant le résultat de l'addition-rotation car celui-ci sera stocké dans $b_{s+1}$
 \end{itemize}
 
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+   \hline
+   $a$ & $b$ & $c$ & $d$ & $non\_lin$ & $carry41$ & $carry42$ & $sum4$ & $carry\_lr$ \\
+   \hline
+\end{tabular}
 
-\section{Améliorations}
+\subsection{Découpage des formules}
+J'ai découpé la formule permettant de casser en trois parties : 
+\begin{itemize}
+\item initialisation
+\item steps
+\item additions finales
+\end{itemize}
+ 
+L'initialisation consiste simplement à forcer la valeur de certaines variables, notamment les variables correspondant au digest, les quatre blocs $a_0$, $b_0$, $c_0$ et $d_0$ ainsi que les informations partielles sur l'input.
+\par
+Chaque step $s$ est la conjonction des formules suivantes : 
+\begin{itemize}
+  \item Affectation : la formule d'affectation permet de rendre deux blocs de variables égaux. Elle permet de reproduire les trois affectation $d:= c, c:=b , a:= copy_d$ de la fonction MD5.
+  \item Fonction non linéaire : cette formule permet d'inverser la fonction non linéraire correspondant au step qu'on est en train d'inverser. Le résultat est stické dans $non\_lin_s$.
+  \item Addition de 4 blocs : permet d'additionner $a_s$, le résultat de la fonction non linéraire, la composante $s$ du vecteur $k$ et le bloc de l'input correspondant au step quel'on souhaite inverser. On aurait pu ici combiner simplement des additions de blocs deux à deux mais le nombre de variables aurait alors significativement augmenté : on aurait eu besoin de trois additions et donc de trois blocs pour les retenues et trois blocs pour les résultats. Ici, on divise donc par deux le nombre de variables utilisées en se contentant de deux blocs de retenue et d'un bloc de résultat. Le résultat de l'addition est stocké dans $sum4_s$.
+  \item Addition-rotation : permet de combiner la rotation du résultat de l'addition de 4 blocs et l'addition de cette rotation à $b_s$. Le résultat est stocké dans $b_{s+1}$. Ici, on évite d'utiliser des variables intermédiaires pour stocker le résultat de la rotation car on peut directement faire la rotation au moment de l'addition. On remarque que cette fonction est également utilisée au moment de l'addition finale avec une valeur de rotation nulle.
+\end{itemize}
+
+\subsection{Implémentation des formules}
+Chacune des formules énumérées ci-dessus est calculée par une fonction indépendante qui prend en paramètre les blocs considérés. L'affectation et la fonction non linéaire ne posent pas de difficultés : l'affectation est une conjonction de littéraux et la fonction non linéaire est déjà écrite sous forme logique dans MD5. Détaillons plutôt le calcul de la formule de l'addition de 4 blocs. 
+\par
+Pour chaque variable du bloc de résultat, j'ai besoin d'une conjonction de 32 formules.
+\section{Bilan et améliorations}
+Comparaison entre 3 addition de 2 blocs et une addition de 4 blocs. Est-ce que enlever a,c et d est rentable? Doit-on implémenter les autres fonctions non linéaires?
 
 \section{Conclusion}
 

@@ -12,13 +12,13 @@ open Formula
 open Data
 
 (* Fonctionnement : j'ai divisé le calcul de la formule en 5 parties : 
--initialisation des variables
--affectation (qui correspondent aux d:=!c dans md.ml))
--inversion de la fonction non linéaire
--addition de 4 mots de 32 bits
--addition combiné à la rotation (ce qui permet de diminuer le nombre de clauses)
+   -initialisation des variables
+   -affectation (qui correspondent aux d:=!c dans md.ml))
+   -inversion de la fonction non linéaire
+   -addition de 4 mots de 32 bits
+   -addition combiné à la rotation (ce qui permet de diminuer le nombre de clauses)
 
-Pour chacune de ces phases, j'ai écrit une fonction caml associée qui, pour prendre en paramètre un mot de 32 bits, reçoit le numéro de la première variable correpondant à ces 32 bits.*)
+   Pour chacune de ces phases, j'ai écrit une fonction caml associée qui, pour prendre en paramètre un mot de 32 bits, reçoit le numéro de la première variable correpondant à ces 32 bits.*)
 
 (*ce serait mieux de faire un open mais ça marche pas...*)
 (*choix du mot*)
@@ -103,7 +103,7 @@ let carry_lr_nb= 8
 
 (*var index permet de renvoyer le numéro de la première variable d'un groupe de 32 bits. *)
 let var_index step_index s = 
-    begin_round + s*var_per_step + (step_index * 32) 
+  begin_round + s*var_per_step + (step_index * 32) 
 
 (*as , bs ,cs, ds avec s le numéro du step*)
 let a s = var_index a_nb s
@@ -132,11 +132,11 @@ let f b_start c_start d_start non_lin_start =
   for i = 0 to 31 do 
     formula_f := And(!formula_f,
 		     Equiv(
-			 Or(
-			     And(pos (b_start + i), pos (c_start + i)),
-			     And(neg (b_start + i), pos (d_start + i))
+		       Or(
+			 And(pos (b_start + i), pos (c_start + i)),
+			 And(neg (b_start + i), pos (d_start + i))
 		       ), pos(non_lin_start + i)
-		    ))
+		     ))
   done;
   !formula_f
 
@@ -166,7 +166,7 @@ let affectation receiver sender =
   for i = 0 to 31 do 
     formula_aff := And(!formula_aff,
 		       Equiv(pos (receiver + i) , pos (sender + i))
-		      )
+    )
       
 
   done;
@@ -180,7 +180,7 @@ let bound_digest_test_aff digest =
 				  Equiv ( pos (b 0 + i), Const(b0.(i)))),
 			      And(Equiv ( pos (c 0 + i), Const(c0.(i))),
 				  Equiv ( pos (d 0 + i), Const(d0.(i))))
-			      ))
+			  ))
   done;
   !formula_bound
 
@@ -202,18 +202,18 @@ let formula_add_rot_bool addend1 addend2_rot carry result i r n =
   let nb_true = count_true bool_arr in 
   let sum_res = int_to_bin nb_true 2 in 
   Imply(list_to_formula [
-	    lit (addend1 + i) bool_arr.(0);
-	    lit (addend2_rot + (modz (i - r) 32)) bool_arr.(1) ;
-	    lit (carry + i) bool_arr.(2)
-	  ],
+    lit (addend1 + i) bool_arr.(0);
+    lit (addend2_rot + (modz (i - r) 32)) bool_arr.(1) ;
+    lit (carry + i) bool_arr.(2)
+  ],
 	if i = 31 then
 	  lit (result + i) sum_res.(0)
 	else
 	  list_to_formula [
-	      lit (result + i) sum_res.(0);
-	      lit (carry + i + 1) sum_res.(1)
-	    ]
-       )
+	    lit (result + i) sum_res.(0);
+	    lit (carry + i + 1) sum_res.(1)
+	  ]
+  )
 
 (*non testé*)
 (* ici, dep_rot est le numéro de la première variable du mot 32 bits qui subit la rotation et dep_b est le deuxième mot 32 bits qui lui est additionné*)
@@ -246,53 +246,53 @@ let test_add_rotate digest =
 
 
 (*addendi est le ième terme de l'addition. 
-add_arr4 est un tableau de boléen dont on connait la valeur (en pratique, c'est vectK.s) pour les tests, on peut le mettre à 0. 
-carry ;: retenues
-result : résultat de l'addition
-n appartient à [0,31], il représente les 5 bits associés aux trois termes et aux deux retenues *)
+  add_arr4 est un tableau de boléen dont on connait la valeur (en pratique, c'est vectK.s) pour les tests, on peut le mettre à 0. 
+  carry ;: retenues
+  result : résultat de l'addition
+  n appartient à [0,31], il représente les 5 bits associés aux trois termes et aux deux retenues *)
 let formula_add4_bool addend1 addend2 addend3 add_arr4 carry1 carry2 result i n = 
   let bool_arr = int_to_bin n 6 in  (*conversion de n en binaire avec une case de trop*)    
   bool_arr.(5) <- add_arr4.(i);
-(* le nombre de booléens à la valeur true caractérise exactement le résultat de la somme et les deux retenues*)
+  (* le nombre de booléens à la valeur true caractérise exactement le résultat de la somme et les deux retenues*)
   let nb_true = count_true bool_arr in 
   let sum_res = int_to_bin nb_true 3 in  
   
   Imply(
-      list_to_formula [
-	  lit (addend1 + i) bool_arr.(0);
-	  lit (addend2 + i) bool_arr.(1); 
-	  lit (addend3 + i) bool_arr.(2);
-	  lit (carry1 + i) bool_arr.(3);
-	  lit (carry2 + i) bool_arr.(4)
-	] ,
+    list_to_formula [
+      lit (addend1 + i) bool_arr.(0);
+      lit (addend2 + i) bool_arr.(1); 
+      lit (addend3 + i) bool_arr.(2);
+      lit (carry1 + i) bool_arr.(3);
+      lit (carry2 + i) bool_arr.(4)
+    ] ,
 
-      if i = 31 then
-	lit (result + i)  sum_res.(0)
-      else if i = 30 then
-	list_to_formula [
-	    lit (result + i)     sum_res.(0);
-	    lit (carry1 + i + 1) sum_res.(1);
-	  ]
-      else
-	list_to_formula [
-	    lit (result + i)     sum_res.(0);
-	    lit (carry1 + i + 1) sum_res.(1);
-	    lit (carry2 + i + 2) sum_res.(2)
-	  ]
-    )
-  
-	     
+    if i = 31 then
+      lit (result + i)  sum_res.(0)
+    else if i = 30 then
+      list_to_formula [
+	lit (result + i)     sum_res.(0);
+	lit (carry1 + i + 1) sum_res.(1);
+      ]
+    else
+      list_to_formula [
+	lit (result + i)     sum_res.(0);
+	lit (carry1 + i + 1) sum_res.(1);
+	lit (carry2 + i + 2) sum_res.(2)
+      ]
+  )
+    
+    
 
 
 (*testée avec 0-digest, honest-digest, vectK.(0), falses, et trues : OK*)
 let add4 addend1 addend2 addend3 add_arr4 carry1 carry2 result  = 
   (*initialisation des retenues *)
   let formula_add4 = ref (list_to_formula [
-			      Equiv ( pos carry1, Const false);
-			      Equiv ( pos carry2, Const false);
-			      Equiv ( pos (carry2 + 1), Const false)
-			    ]
-			 ) 
+    Equiv ( pos carry1, Const false);
+    Equiv ( pos carry2, Const false);
+    Equiv ( pos (carry2 + 1), Const false)
+  ]
+  ) 
   in
   for i = 0 to 31 do 
     for j = 0 to 31 do 
@@ -310,25 +310,25 @@ let test_add digest =
 
 (** **************************** Initialisation ******************************* **)
 let initialize digest nb_steps = 
-   let init_formula = ref (Const true) in 
-   for i = 0 to 31 do 
+  let init_formula = ref (Const true) in 
+  for i = 0 to 31 do 
     init_formula := list_to_formula [
-			!init_formula;
-			 Equiv ( pos (a 0 + i), Const(a0.(i)));
-			 Equiv ( pos (b 0 + i), Const(b0.(i)));	
-			 Equiv ( pos (c 0 + i), Const(c0.(i)));
-			 Equiv ( pos (d 0 + i), Const(d0.(i)));
+      !init_formula;
+      lit (a 0 + i) a0.(i);
+      lit (b 0 + i) b0.(i);
+      lit (c 0 + i) c0.(i);
+      lit (d 0 + i) d0.(i);
 
-			 Equiv ( pos (last_sum_a nb_steps + i), Const digest.(i));
-			 Equiv ( pos (last_sum_b nb_steps + i), Const digest.(i + 32));	
-			 Equiv ( pos (last_sum_c nb_steps + i), Const digest.(i + 64));
-			 Equiv ( pos (last_sum_d nb_steps + i), Const digest.(i + 96))
-		      ]
-   done;
+      lit (last_sum_a nb_steps + i) digest.(i);
+      lit (last_sum_b nb_steps + i) digest.(i + 32);	
+      lit (last_sum_c nb_steps + i) digest.(i + 64);
+      lit (last_sum_d nb_steps + i) digest.(i + 96)
+    ]
+  done;
   !init_formula
 
 
-  
+    
 (*formula_add4_bool (a s) (non_lin s) (input (choice round s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) i j*)
 
 let inverse_md5 digest nb_steps = 
@@ -337,23 +337,23 @@ let inverse_md5 digest nb_steps =
     let round = s / 16 in
     big_formula := 
       list_to_formula [
-	  !big_formula;
-	  affectation (d (s+1)) (c s);
-	  affectation (c (s+1)) (b s);
-	  affectation (a (s+1)) (d s);
-	  f (b s) (c s) (d s) (non_lin s);
-	  add_rotate (b s) (sum4 s) (carry_lr s) (b (s+1)) vectS.(s);
-	  add4 (a s) (non_lin s) (input (choice round s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) 
-	]    
+	!big_formula;
+	affectation (d (s+1)) (c s);
+	affectation (c (s+1)) (b s);
+	affectation (a (s+1)) (d s);
+	f (b s) (c s) (d s) (non_lin s);
+	add_rotate (b s) (sum4 s) (carry_lr s) (b (s+1)) vectS.(s);
+	add4 (a s) (non_lin s) (input (choice round s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) 
+      ]    
   done;
   big_formula := 
-      list_to_formula [
-	  !big_formula;
-	  add_rotate (a nb_steps) (a 0) (last_carry_a nb_steps) (last_sum_a nb_steps) 0;
-	  add_rotate (b nb_steps) (b 0) (last_carry_b nb_steps) (last_sum_b nb_steps) 0;
-	  add_rotate (c nb_steps) (c 0) (last_carry_c nb_steps) (last_sum_c nb_steps) 0;
-	  add_rotate (d nb_steps) (d 0) (last_carry_d nb_steps) (last_sum_d nb_steps) 0;
-	] ;   
+    list_to_formula [
+      !big_formula;
+      add_rotate (a nb_steps) (a 0) (last_carry_a nb_steps) (last_sum_a nb_steps) 0;
+      add_rotate (b nb_steps) (b 0) (last_carry_b nb_steps) (last_sum_b nb_steps) 0;
+      add_rotate (c nb_steps) (c 0) (last_carry_c nb_steps) (last_sum_c nb_steps) 0;
+      add_rotate (d nb_steps) (d 0) (last_carry_d nb_steps) (last_sum_d nb_steps) 0;
+    ] ;   
   formulaeToCnf !big_formula
 
 (*** Main function 
