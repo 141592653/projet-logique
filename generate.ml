@@ -354,12 +354,13 @@ let inverse_md5 digest nb_steps =
       add_rotate (c nb_steps) (c 0) (last_carry_c nb_steps) (last_sum_c nb_steps) 0;
       add_rotate (d nb_steps) (d 0) (last_carry_d nb_steps) (last_sum_d nb_steps) 0;
     ] ;   
-  formulaeToCnf !big_formula
+  let big_f = formulaeToCnf !big_formula in 
+  big_f
 
 (*** Main function 
      * Digest : tableau de 128 bits ***)
 let genCNF digest = 
-  inverse_md5 digest 16
+  inverse_md5 digest 2
 
 
 (*WEAK HASH : let etape i = 

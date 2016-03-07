@@ -88,8 +88,9 @@ let subst f tau =
   
   simple (subst_list tau f_simple)
     
-    
+  
 let formulaeToCnf fl = 
+  (*ici, pre correspond à preCcopute : on calcule d'abord la formule sous forme cnf mais avec le type formule puis on convertit avec preToCNF au type cnf.*)
   let rec simpleToPre f = match f with 
     |Const _ | Lit _ -> f
     |Or(f1,f2) -> let nf1 = simpleToPre f1 and nf2 = simpleToPre f2 in

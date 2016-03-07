@@ -38,6 +38,7 @@ let basename s =
     Compute pre-image (or image) of a given digest (resp. input) stored in file
     [fn_input] *)
 let computeRes fn_input =
+  let beg_time = Sys.time () in 
   let fn_cnf = String.concat "" [basename fn_input; fn_cnf_suffix]
   and fn_res = String.concat "" [basename fn_input; fn_res_suffix]
   and fn_digest = String.concat "" [basename fn_input; fn_digest_suffix] 
@@ -80,6 +81,11 @@ let computeRes fn_input =
       (* Compute the CNF describing possible pre-images *)
       log ~level:Low "Computing CNF...";
       let cnf = Generate.genCNF digest in
+
+
+      Printf.printf "**************** Time to compute cnf ********************* \n             %f sec \n" (Sys.time () -. beg_time);
+
+
       log ~level:Low "Displaying CNF...";
       let cnf_display = Formula.displayCnf cnf in
       (* log ~level:Low (sprintf "CNF is \n%s" cnf_display); *)
@@ -91,6 +97,7 @@ let computeRes fn_input =
       close_out oc;
 
       (* Launch Sat-solver on CNF *)
+      
       log (sprintf "Launching %s and write result in %s..." !sat_solver fn_sol);
       let resc = (Unix.open_process_in
 		    (!sat_solver ^ " \"" ^ (String.escaped fn_cnf)^ "\""^
@@ -110,6 +117,10 @@ let computeRes fn_input =
 		     else String.concat "\n" (List.rev !acc) in
       close_in resc;
 
+
+        Printf.printf "**************** Time for minisat ********************* \n             %f sec \n" (Sys.time () -. beg_time);
+
+
       (* Print the result (SAT?)*)
       log ~level:Low(sprintf "### Result of minisat:\n%s\n" resSAT);
 
@@ -122,6 +133,10 @@ let computeRes fn_input =
 			line1^line2)
 		   with e -> close_in_noerr ic; raise e in
       log ~level:Low (sprintf "Parsing %s ..." solSAT);
+
+       Printf.printf "**************** Time parsing ********************* \n             %f sec \n" (Sys.time () -. beg_time);
+
+
       let inputFound = Data.parseSol solSAT in
       
       match inputFound with
@@ -137,8 +152,10 @@ let computeRes fn_input =
 	  let digest2 = Md.compute input in
 	  log (sprintf "Computed digest is: [ %s]" (Data.displayDigest digest2));
 	  log (sprintf "==> Are they equal?: %b" (Data.eqDigest digest digest2));
+	  Printf.printf "**************** Total time ********************* \n             %f sec \n" (Sys.time () -. beg_time)
 	end
-    end
+  end
+     
 	 
 let main () =	      
   Arg.parse [("-r", Arg.Int (fun rounds -> Param.rounds := rounds), "Fix the number of rounds");
