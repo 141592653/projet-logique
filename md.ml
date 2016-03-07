@@ -163,18 +163,19 @@ let test_add input =
    convert432_to_digest digest
 
 (*ici un seul round*)
-let md5 input nb_steps = 
+let md5 input  = 
   let input_32 = convert_input_to_32 input in 
   let digest = Array.make_matrix 4 32 true in 
   let a = ref a0 and b = ref b0 and c = ref c0 and d = ref d0 in 
-  for s = 0 to nb_steps - 1 do 
-    let round = s / 16 in 
-    let temp = Array.copy !d in 
-    let f = non_linear round !b !c !d in 
-    d:=!c;
-    c:=!b;
-    b:= add_32 !b (left_rotate (add_32 (add_32 !a f ) (add_32 vectK.(s) input_32.(choice round s))) vectS.(s)) ;
-    a:= temp
+  for r = 0 to !Param.rounds - 1 do 
+    for s = r * !Param.steps to (r + 1) * !Param.steps - 1 do  
+      let temp = Array.copy !d in 
+      let f = non_linear r !b !c !d in 
+      d:=!c;
+      c:=!b;
+      b:= add_32 !b (left_rotate (add_32 (add_32 !a f ) (add_32 vectK.(s) input_32.(choice r s))) vectS.(s)) ;
+      a:= temp
+    done
   done;
   
   digest.(0) <- add_32 !a a0; digest.(1) <- add_32 !b b0;
@@ -184,7 +185,7 @@ let md5 input nb_steps =
 
 (*** Main function ***)	  
 let compute input =
-  md5 input !Param.steps
+  md5 input 
 
 
 	 

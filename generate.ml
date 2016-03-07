@@ -69,35 +69,31 @@ let lit n b =
     neg n
 
 (*Variables de 1 à 512 : input, s est le numéro du steo*)
-let input s = 1 + s*32
+let input s =  1 + s*32
 
 (*Première variable du round*)
-let begin_round = 609
+let begin_round = 513 (*input*) + 3*32 (*a0 c0 d0*) + 8*32 (*carry et sum finaux*)
 
 (*nombre de variables dans un step*)
-let var_per_step = 9 * 32
+let var_per_step = 6 * 32
 (* on met Param.steps +1 à cause de a0, b0, c0, d0 qui en quelque sortent comptent pour un step*)
-let end_round = begin_round + (!Param.steps + 1) * var_per_step
 
-let last_carry_a = end_round 
-let last_carry_b = end_round + 32
-let last_carry_c = end_round + 64
-let last_carry_d = end_round + 128
-let last_sum_a = last_carry_d + 32
-let last_sum_b = last_carry_d + 64
-let last_sum_c = last_carry_d + 128
-let last_sum_d = last_carry_d + 160
+let last_carry_a = 513 + 3*32 
+let last_carry_b = 513 + 4*32
+let last_carry_c = 513 + 5*32
+let last_carry_d = 513 + 6*32
+let last_sum_a = 513 + 7*32
+let last_sum_b = 513 + 8*32
+let last_sum_c = 513 + 9*32
+let last_sum_d = 513 + 10*32
 
 (*indice dans le step des différentes variables. Les variables d'un step sont rangées par groupe de 32 variables. Ici, le premier groupe correspond aux 32 bits de a, le second ceux de b, etc. *)
-let a_nb= 0
-let b_nb= 1
-let c_nb= 2
-let d_nb= 3
-let non_lin_nb= 4
-let carry41_nb= 5
-let carry42_nb= 6
-let sum4_nb= 7
-let carry_lr_nb= 8
+let b_nb= 0
+let non_lin_nb= 1
+let carry41_nb= 2
+let carry42_nb= 3
+let sum4_nb= 4
+let carry_lr_nb= 5
 
 
 (*var index permet de renvoyer le numéro de la première variable d'un groupe de 32 bits. *)
@@ -109,20 +105,15 @@ let var_index step_index s =
 let b s =  if s >= 0 then var_index b_nb s
 	  else
 	    match s with 
-	    (*)|0 -> 609*)
-	    |(-1) -> 567 (*d0*)
-	    |(-2)-> 535 (*c0*)
+	    |(-1) -> 577 (*d0*)
+	    |(-2)-> 545 (*c0*)
 	    |(-3)-> 513 (*a0*)
+	    | _ -> failwith "Impossible de donner à b une valeur inférieure à -4"
 
-(*let a s = b (s-3)
+let a s = b (s-3)
 let c s = b (s-1)
-let d s = b (s-2)*)
+let d s = b (s-2)
 
-let a s = if s > 0 then var_index a_nb s
-	  else
-	    513
-let c s = var_index c_nb s
-let d s = var_index d_nb s
 
 (*résultat de la fonction non linéaire*)
 let non_lin s = var_index non_lin_nb s
@@ -153,6 +144,53 @@ let f b_start c_start d_start non_lin_start =
   done;
   !formula_f
 
+let g b_start c_start d_start non_lin_start = 
+  let formula_g = ref (Const true) in 
+  for i = 0 to 31 do 
+    formula_g := And(!formula_g,
+		     Equiv(
+		       Or(
+			 And(pos (b_start + i), pos (d_start + i)),
+			 And(neg (d_start + i), pos (c_start + i))
+		       ), pos(non_lin_start + i)
+		     ))
+  done;
+  !formula_g
+
+let h b_start c_start d_start non_lin_start = 
+  let formula_h = ref (Const true) in 
+  for i = 0 to 31 do 
+    formula_h := And(!formula_h,
+		     Equiv(
+		       Xor(
+			 Xor(pos (b_start + i), pos (c_start + i)),
+			 pos (d_start + i)
+		       ), pos(non_lin_start + i)
+		     ))
+  done;
+  !formula_h
+
+let i b_start c_start d_start non_lin_start = 
+  let formula_i = ref (Const true) in 
+  for i = 0 to 31 do 
+    formula_i := And(!formula_i,
+		     Equiv(
+		       Xor(
+			 pos (c_start + i),
+			 Or(neg (d_start + i), pos (b_start + i))
+		       ), pos(non_lin_start + i)
+		     ))
+  done;
+  !formula_i
+
+let non_lin_func round = 
+  match round with 
+    |0 -> f
+    |1 -> g
+    |2 -> h
+    |3 -> i
+    | _ -> failwith "Il y a plus de 5 rounds."
+
 
 (*Instructions pour tester les fonctions non linéaires :
   mettre la variable test à true
@@ -171,34 +209,7 @@ let bound_digest_test_f digest =
 let test_f digest =
   formulaeToCnf (And(bound_digest_test_f digest,f 1 33 65 97)) 
 
-
-(** ******************************* Affectations *********************************)
-(* non testé *)
-let affectation receiver sender =
-  let formula_aff = ref (Const true) in 
-  for i = 0 to 31 do 
-    formula_aff := And(!formula_aff,
-		       Equiv(pos (receiver + i) , pos (sender + i))
-    )
-      
-
-  done;
-  !formula_aff   
-
-let bound_digest_test_aff digest = 
-  let formula_bound = ref (Const true) in 
-  for i = 0 to 31 do 
-    formula_bound := And (!formula_bound,
-			  And(And(Equiv ( pos (a 0 + i), Const(a0.(i))) ,
-				  Equiv ( pos (b 0 + i), Const(b0.(i)))),
-			      And(Equiv ( pos (c 0 + i), Const(c0.(i))),
-				  Equiv ( pos (d 0 + i), Const(d0.(i))))
-			  ))
-  done;
-  !formula_bound
-
-let test_aff digest = 
-  formulaeToCnf (And(bound_digest_test_aff digest,affectation (a 0) (b 0))) 
+ 
 
 (** ****************************** Addition - rotation ***************************)
 
@@ -331,6 +342,7 @@ let initialize digest =
       lit (b 0 + i) b0.(i);
       lit (c 0 + i) c0.(i);
       lit (d 0 + i) d0.(i);
+      
 
       lit (last_sum_a + i) digest.(i);
       lit (last_sum_b + i) digest.(i + 32);	
@@ -343,27 +355,27 @@ let initialize digest =
 
 
 let inverse_md5 digest  = 
-  let big_formula = ref (initialize digest) in  
-  for s = 0 to !Param.steps - 1 do
-    let round = s / 16 in
-    big_formula := 
-      list_to_formula [
-	!big_formula;
-	affectation (d (s+1)) (c s);
-	affectation (c (s+1)) (b s);
-	affectation (a (s+1)) (d s);
-	f (b s) (c s) (d s) (non_lin s);
-	add_rotate (b s) (sum4 s) (carry_lr s) (b (s+1)) vectS.(s);
-	add4 (a s) (non_lin s) (input (choice round s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) 
-      ]    
+  let big_formula = ref (initialize digest) in
+  for r = 0 to !Param.rounds - 1 do
+    for s = r * !Param.steps to (r + 1) * !Param.steps - 1 do
+      big_formula := 
+	list_to_formula [
+	    !big_formula;
+	    non_lin_func r (b s) (c s) (d s) (non_lin s);
+	    add_rotate (b s) (sum4 s) (carry_lr s) (b (s+1)) vectS.(s);
+	    add4 (a s) (non_lin s) (input (choice r s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) 
+	  ]    
+
+    done
   done;
+  let last_variables = !Param.rounds * !Param.steps in 
   big_formula := 
     list_to_formula [
       !big_formula;
-      add_rotate (a !Param.steps) (a 0) last_carry_a last_sum_a 0;
-      add_rotate (b !Param.steps) (b 0) last_carry_b last_sum_b 0;
-      add_rotate (c !Param.steps) (c 0) last_carry_c last_sum_c 0;
-      add_rotate (d !Param.steps) (d 0) last_carry_d last_sum_d 0;
+      add_rotate (a last_variables) (a 0) last_carry_a last_sum_a 0;
+      add_rotate (b last_variables) (b 0) last_carry_b last_sum_b 0;
+      add_rotate (c last_variables) (c 0) last_carry_c last_sum_c 0;
+      add_rotate (d last_variables) (d 0) last_carry_d last_sum_d 0;
     ] ;   
   let big_f = formulaeToCnf !big_formula in 
   big_f

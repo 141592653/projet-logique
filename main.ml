@@ -83,13 +83,13 @@ let computeRes fn_input =
       let cnf = Generate.genCNF digest in
 
 
-      Printf.printf "**************** Time to compute cnf ********************* \n             %f sec \n" (Sys.time () -. beg_time);
+      log ~level:Low ( sprintf "**************** Time to compute formula ********************* \n             %f sec \n" (Sys.time () -. beg_time));
 
 
       log ~level:Low "Displaying CNF...";
       let cnf_display = Formula.displayCnf cnf in
       (* log ~level:Low (sprintf "CNF is \n%s" cnf_display); *)
-      Printf.printf "**************** Time to display cnf ********************* \n             %f sec \n" (Sys.time () -. beg_time);
+      log ~level:Low ( sprintf "**************** Time to compute string  ********************* \n             %f sec \n" (Sys.time () -. beg_time));
 
       (* Write this in CNF file *)
       log (sprintf "Writing CNF in %s..." fn_cnf);
@@ -97,7 +97,8 @@ let computeRes fn_input =
       Printf.fprintf oc  "%s\n" cnf_display;
       close_out oc;
 
-      Printf.printf "**************** Time before minisat ********************* \n             %f sec \n" (Sys.time () -. beg_time);
+      log ~level:Low ( sprintf "**************** Time before minisat ********************* \n             %f sec \n" (Sys.time () -. beg_time));
+
 
       (* Launch Sat-solver on CNF *)
       
@@ -121,7 +122,7 @@ let computeRes fn_input =
       close_in resc;
 
 
-      Printf.printf "**************** Time after minisat ********************* \n             %f sec \n" (Sys.time () -. beg_time);
+      log ~level:Low ( sprintf "**************** Time after minisat ********************* \n             %f sec \n" (Sys.time () -. beg_time));
 
 
       (* Print the result (SAT?)*)
@@ -136,8 +137,6 @@ let computeRes fn_input =
 			line1^line2)
 		   with e -> close_in_noerr ic; raise e in
       log ~level:Low (sprintf "Parsing %s ..." solSAT);
-
-       Printf.printf "**************** Time parsing ********************* \n             %f sec \n" (Sys.time () -. beg_time);
 
 
       let inputFound = Data.parseSol solSAT in
@@ -155,7 +154,7 @@ let computeRes fn_input =
 	  let digest2 = Md.compute input in
 	  log (sprintf "Computed digest is: [ %s]" (Data.displayDigest digest2));
 	  log (sprintf "==> Are they equal?: %b" (Data.eqDigest digest digest2));
-	  Printf.printf "**************** Total time ********************* \n             %f sec \n" (Sys.time () -. beg_time)
+	  log (sprintf "**************** Total time ********************* \n             %f sec \n" (Sys.time () -. beg_time))
 	end
   end
      
