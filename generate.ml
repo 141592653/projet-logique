@@ -118,7 +118,9 @@ let b s =  if s >= 0 then var_index b_nb s
 let c s = b (s-1)
 let d s = b (s-2)*)
 
-let a s = var_index a_nb s
+let a s = if s > 0 then var_index a_nb s
+	  else
+	    513
 let c s = var_index c_nb s
 let d s = var_index d_nb s
 
