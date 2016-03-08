@@ -3,6 +3,8 @@ formula.cmi :
 generate.cmi : formula.cmi data.cmi
 md.cmi : data.cmi
 param.cmi :
+copie\ de\ generate.cmo : param.cmi formula.cmi data.cmi
+copie\ de\ generate.cmx : param.cmx formula.cmx data.cmx
 data.cmo : param.cmi data.cmi
 data.cmx : param.cmx data.cmi
 formula.cmo : param.cmi formula.cmi

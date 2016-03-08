@@ -333,7 +333,7 @@ let test_add digest =
 
 
 (** **************************** Initialisation ******************************* **)
-let initialize digest = 
+let initialize digest partial_input = 
   let init_formula = ref (Const true) in 
   for i = 0 to 31 do 
     init_formula := list_to_formula [
@@ -349,6 +349,9 @@ let initialize digest =
       lit (last_sum_c + i) digest.(i + 64);
       lit (last_sum_d + i) digest.(i + 96)
     ]
+  done;
+  for i = 0 to !Param.partialSize - 1 do 
+    init_formula := And( !init_formula , lit (i+1) partial_input.(i))
   done;
   !init_formula
 
@@ -374,7 +377,7 @@ let parse_partial_input () =
   |None -> [||]
       
 let inverse_md5 digest  = 
-  let big_formula = ref (initialize digest) in
+  let big_formula = ref (Const true) in
   for r = 0 to !Param.rounds - 1 do
     for s = r * !Param.steps to (r + 1) * !Param.steps - 1 do
       let nl = non_lin_func r (b s) (c s) (d s) (non_lin s) in 
@@ -408,12 +411,12 @@ let inverse_md5 digest  =
     ] ;   
   (*big_formula := subst_32 (a 0) Data.a0 !big_formula;*)
   (*big_formula := subst_vect 1  !big_formula*)
+  
   let partial_input = parse_partial_input () in
-  Printf.printf "%d\n" !Param.partialSize;
   if Array.length partial_input = 0 then 
-    formulaeToCnf !big_formula
+    formulaeToCnf (And(initialize digest partial_input , !big_formula))
   else
-    formulaeToCnf (subst_vect 1 (Array.sub partial_input 0 !Param.partialSize ) !big_formula)
+    formulaeToCnf (And (initialize digest partial_input, subst_vect 1 (Array.sub partial_input 0 !Param.partialSize) !big_formula) )
 
 (*** Main function 
      * Digest : tableau de 128 bits ***)
