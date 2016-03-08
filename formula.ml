@@ -73,20 +73,24 @@ let rec simple  f = match f with
     
 
 let subst f tau = 
-  let f_simple = simple f in 
+ (*) let f_simple = simple f in *)
   let rec subst_rec f x b = match f with 
     |Const(_) -> f
     |Lit (Pos d) when (d = x) -> Const(b)
     |Lit (Neg d) when (d = x) -> Const(not b)
+    |Lit _ -> f
     |Or (g,d)-> Or(subst_rec g x b, subst_rec d x b)
+    |Not f -> Not (subst_rec f x b)
     |And (g,d)-> And(subst_rec g x b, subst_rec d x b)
-    |_ -> failwith "Simple failed"
+    |Imply (g,d)-> Imply(subst_rec g x b, subst_rec d x b)
+    |Equiv (g,d)-> Equiv(subst_rec g x b, subst_rec d x b)
+    |Xor (g,d)-> Xor(subst_rec g x b, subst_rec d x b)
   in
   let rec subst_list l f = match l with 
     |[] -> f
     |(x,b)::q -> subst_list q (subst_rec f x b) in 
   
-  simple (subst_list tau f_simple)
+  subst_list tau f
     
   
 let formulaeToCnf fl = 

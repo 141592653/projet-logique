@@ -338,10 +338,10 @@ let initialize digest =
   for i = 0 to 31 do 
     init_formula := list_to_formula [
       !init_formula;
-      lit (a 0 + i) a0.(i);
+      (*lit (a 0 + i) a0.(i);
       lit (b 0 + i) b0.(i);
       lit (c 0 + i) c0.(i);
-      lit (d 0 + i) d0.(i);
+      lit (d 0 + i) d0.(i);*)
       
 
       lit (last_sum_a + i) digest.(i);
@@ -353,18 +353,47 @@ let initialize digest =
   !init_formula
 
 
+let subst_vect var_nb bool_arr formula = 
+  let rec create_subst i =
+    if i = Array.length bool_arr then  []
+      else (var_nb + i, bool_arr.(i)) :: (create_subst (i+1)) 
+  in
 
+  Formula.subst formula (create_subst 0)
+
+(*Permet de récupérer la valeur des première variables de l'input*)
+let parse_partial_input () = 
+  match !Param.partialKnownInput with 
+  |Some name_file ->
+    let input_str = let ic = open_in name_file in
+		    try (let line = input_line ic in
+			 close_in ic;
+			 line)
+	      with e -> close_in_noerr ic; raise e in
+    Data.parseInput input_str 
+  |None -> [||]
+      
 let inverse_md5 digest  = 
   let big_formula = ref (initialize digest) in
   for r = 0 to !Param.rounds - 1 do
     for s = r * !Param.steps to (r + 1) * !Param.steps - 1 do
+      let nl = non_lin_func r (b s) (c s) (d s) (non_lin s) in 
+      let addr =  add_rotate (b s) (sum4 s) (carry_lr s) (b (s+1)) vectS.(s) in 
+      let add4f = add4 (a s) (non_lin s) (input (choice r s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) in 
       big_formula := 
 	list_to_formula [
 	    !big_formula;
-	    non_lin_func r (b s) (c s) (d s) (non_lin s);
-	    add_rotate (b s) (sum4 s) (carry_lr s) (b (s+1)) vectS.(s);
-	    add4 (a s) (non_lin s) (input (choice r s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) 
-	  ]    
+	    nl;
+	    addr;
+	    add4f
+	  ];    
+	if s = 3 then
+	  begin
+	    big_formula := subst_vect (a 0) Data.a0 !big_formula;
+	    big_formula := subst_vect (b 0) Data.b0 !big_formula;
+	    big_formula := subst_vect (c 0) Data.c0 !big_formula;
+	    big_formula := subst_vect (d 0) Data.d0 !big_formula;
+	  end
 
     done
   done;
@@ -372,13 +401,19 @@ let inverse_md5 digest  =
   big_formula := 
     list_to_formula [
       !big_formula;
-      add_rotate (a last_variables) (a 0) last_carry_a last_sum_a 0;
-      add_rotate (b last_variables) (b 0) last_carry_b last_sum_b 0;
-      add_rotate (c last_variables) (c 0) last_carry_c last_sum_c 0;
-      add_rotate (d last_variables) (d 0) last_carry_d last_sum_d 0;
+      subst_vect (a 0) Data.a0 (add_rotate (a last_variables) (a 0) last_carry_a last_sum_a 0);
+      subst_vect (b 0) Data.b0 (add_rotate (b last_variables) (b 0) last_carry_b last_sum_b 0);
+      subst_vect (c 0) Data.c0 (add_rotate (c last_variables) (c 0) last_carry_c last_sum_c 0);
+      subst_vect (d 0) Data.d0 (add_rotate (d last_variables) (d 0) last_carry_d last_sum_d 0);
     ] ;   
-  let big_f = formulaeToCnf !big_formula in 
-  big_f
+  (*big_formula := subst_32 (a 0) Data.a0 !big_formula;*)
+  (*big_formula := subst_vect 1  !big_formula*)
+  let partial_input = parse_partial_input () in
+  Printf.printf "%d\n" !Param.partialSize;
+  if Array.length partial_input = 0 then 
+    formulaeToCnf !big_formula
+  else
+    formulaeToCnf (subst_vect 1 (Array.sub partial_input 0 !Param.partialSize ) !big_formula)
 
 (*** Main function 
      * Digest : tableau de 128 bits ***)
