@@ -404,10 +404,18 @@ let inverse_md5 digest  =
   big_formula := 
     list_to_formula [
       !big_formula;
-      subst_vect (a 0) Data.a0 (add_rotate (a last_variables) (a 0) last_carry_a last_sum_a 0);
-      subst_vect (b 0) Data.b0 (add_rotate (b last_variables) (b 0) last_carry_b last_sum_b 0);
-      subst_vect (c 0) Data.c0 (add_rotate (c last_variables) (c 0) last_carry_c last_sum_c 0);
-      subst_vect (d 0) Data.d0 (add_rotate (d last_variables) (d 0) last_carry_d last_sum_d 0);
+      subst_vect last_sum_a (Array.sub digest 0 32)
+	(subst_vect (a 0) Data.a0 
+	   (add_rotate (a last_variables) (a 0) last_carry_a last_sum_a 0));
+      subst_vect last_sum_b (Array.sub digest 32 32)
+	(subst_vect (b 0) Data.b0 
+	   (add_rotate (b last_variables) (b 0) last_carry_b last_sum_b 0));
+      subst_vect last_sum_c (Array.sub digest 64 32)
+	(subst_vect (c 0) Data.c0 
+	   (add_rotate (c last_variables) (c 0) last_carry_c last_sum_c 0));
+      subst_vect last_sum_d (Array.sub digest 96 32)
+	(subst_vect (d 0) Data.d0 
+	   (add_rotate (d last_variables) (d 0) last_carry_d last_sum_d 0));
     ] ;   
   (*big_formula := subst_32 (a 0) Data.a0 !big_formula;*)
   (*big_formula := subst_vect 1  !big_formula*)

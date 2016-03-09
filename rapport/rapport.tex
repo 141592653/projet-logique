@@ -32,25 +32,26 @@ Tout d'abord, les variables sont organisées en groupes de 32 bits. Un groupe de
 Ensuite, ces groupes (à l'exception des variables de l'input et des quatre additions finales de MD5) sont organisés en steps, chaque step représentant les variables nécessaires à l'inversion de ce step.
 \newline
 
-\begin{tabular}{|c|c|c|c|c|c|c|}
+\begin{tabular}{|c|c|c|c|c|c|c|c|}
    \hline
-   Input (16 blocs) & $Step_0$ (9 blocs) & $Step_1$ & $Step_2$ & ... & $Step_k$ & Dernières additions (8 blocs) \\
+   Input (16 blocs) & $a_0$,$c_0$,$d_0$ & Dernières additions (8 blocs)& $Step_0$ (6 blocs) & $Step_1$ & $Step_2$ & ... & $Step_k$   \\
    \hline
 \end{tabular}
 \newline
 \par
-Chaque step $s$ est composé de 9 blocs : 
+Chaque step $s$ est composé de 6 blocs : 
 \begin{itemize}
-\item $a_s,b_s,c_s,d_s$ sont les quatre blocs qui sont calculés par la boucle principale de MD5
+\item $b_s$ contient les variables correspondant aux calculs successifs de $b$ dans la boucle principale de md5. On peut aisément connaître $a_s$, $c_s$ et $d_s$ en remarquant que, en posant $b_{-1} = c_0$, $b_{-2} = d_0$ et $b_{-3} = a_0$ , on a $a_s = b_{s-3}$, $c_s = b_{s-1}$ et  $d_s = b_{s-3}$.
 \item $non\_lin_s$ est le résultat de la fonction non linéaire
 \item $carry41_s, carry42_s$ sont les deux retenues nécessaires à l'addition de quatre blocs.
 \item $sum4$ est le résultat de l'addition des quatre blocs
 \item $carry\_lr$ est la retenue pour l'opération d'addition-rotation. Il est à noter que l'on a pas besoin de variables représentant le résultat de l'addition-rotation car celui-ci sera stocké dans $b_{s+1}$
 \end{itemize}
 
-\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+\vspace{0.4cm}
+\begin{tabular}{|c|c|c|c|c|c|}
    \hline
-   $a$ & $b$ & $c$ & $d$ & $non\_lin$ & $carry41$ & $carry42$ & $sum4$ & $carry\_lr$ \\
+    $b$& $non\_lin$ & $carry41$ & $carry42$ & $sum4$ & $carry\_lr$ \\
    \hline
 \end{tabular}
 
@@ -62,7 +63,7 @@ J'ai découpé la formule permettant de casser en trois parties :
 \item additions finales
 \end{itemize}
  
-L'initialisation consiste simplement à forcer la valeur de certaines variables, notamment les variables correspondant au digest, les quatre blocs $a_0$, $b_0$, $c_0$ et $d_0$ ainsi que les informations partielles sur l'input.
+L'initialisation consistait à l'origine à forcer la valeur de certaines variables, notamment les variables correspondant au digest, les quatre blocs $a_0$, $b_0$, $c_0$ et $d_0$ ainsi que les informations partielles sur l'input. Cependant, pour accélérer le calcul de minisat, le mieux est d'utiliser la substitiution afin de diminuer le nombre de clauses et de variables. Je me suis donc contenter d'initialiser l'information partielle sur l'input car la substitution ne suffit pas : on doit dire à minisat que certaines variables de l'input sont déjà connues.
 \par
 Chaque step $s$ est la conjonction des formules suivantes : 
 \begin{itemize}
@@ -75,7 +76,7 @@ Chaque step $s$ est la conjonction des formules suivantes :
 \subsection{Implémentation des formules}
 Chacune des formules énumérées ci-dessus est calculée par une fonction indépendante qui prend en paramètre les blocs considérés. L'affectation et la fonction non linéaire ne posent pas de difficultés : l'affectation est une conjonction de littéraux et la fonction non linéaire est déjà écrite sous forme logique dans MD5. Détaillons plutôt le calcul de la formule de l'addition de 4 blocs. 
 \par
-Pour chaque variable du bloc de résultat, j'ai besoin d'une conjonction de 32 formules.
+Pour chaque variable du bloc de résultat, j'ai besoin d'une conjonction de 32 formules. En effet, selon la valeur des trois termes additionnés et des deux retenues, la sommes ou les retenues seront différentes. Ainsi, pour chacune des distributions possibles pour les 5 variables sus-citées, on donne sous la forme d'une implication la valeur de vérité des retenues suivantes et de la somme.
 \section{Bilan et améliorations}
 Comparaison entre 3 addition de 2 blocs et une addition de 4 blocs. Est-ce que enlever a,c et d est rentable? Doit-on implémenter les autres fonctions non linéaires?
 
