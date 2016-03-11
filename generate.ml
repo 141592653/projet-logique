@@ -335,7 +335,7 @@ let test_add digest =
 (** **************************** Initialisation ******************************* **)
 let initialize digest partial_input = 
   let init_formula = ref (Const true) in 
-  for i = 0 to 31 do 
+  (*for i = 0 to 31 do 
     init_formula := list_to_formula [
       !init_formula;
       (*lit (a 0 + i) a0.(i);
@@ -344,12 +344,12 @@ let initialize digest partial_input =
       lit (d 0 + i) d0.(i);*)
       
 
-      lit (last_sum_a + i) digest.(i);
+      (*lit (last_sum_a + i) digest.(i);
       lit (last_sum_b + i) digest.(i + 32);	
       lit (last_sum_c + i) digest.(i + 64);
-      lit (last_sum_d + i) digest.(i + 96)
+      lit (last_sum_d + i) digest.(i + 96)*)
     ]
-  done;
+  done;*)
   for i = 0 to !Param.partialSize - 1 do 
     init_formula := And( !init_formula , lit (i+1) partial_input.(i))
   done;
@@ -377,20 +377,38 @@ let parse_partial_input () =
   |None -> [||]
       
 let inverse_md5 digest  = 
+  let partial_input = parse_partial_input () in
   let big_formula = ref (Const true) in
   for r = 0 to !Param.rounds - 1 do
     for s = r * !Param.steps to (r + 1) * !Param.steps - 1 do
       let nl = non_lin_func r (b s) (c s) (d s) (non_lin s) in 
       let addr =  add_rotate (b s) (sum4 s) (carry_lr s) (b (s+1)) vectS.(s) in 
-      let add4f = add4 (a s) (non_lin s) (input (choice r s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s) in 
+
+      (* cette variable permet de connaître le nombre de variable qu'on pourra substituer grace à notre connaissance partielle de l'entrée. Ici, le fait de faire les substitutions au fur et à mesure et d'en faire le minimum permet de diminuer significativement le temps de calcul de la formule (sur les ordis de la 411, environ 3 secondes sur 1 round 16 steps)*)
+      let nb_var_known = let tmp = !Param.partialSize - (choice r s) + 1 in
+			 if tmp >= 32 then 
+			   32 
+			 else 
+			   tmp
+      in
+      let add4f = if Array.length partial_input = 0 || (nb_var_known <= 0) then 
+	  add4 (a s) (non_lin s) (input (choice r s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s)
+	else
+	  subst_vect (choice r s) (Array.sub partial_input (choice r s -1) nb_var_known )
+	    (add4 (a s) (non_lin s) (input (choice r s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s))
+	  
+      in 
       big_formula := 
 	list_to_formula [
 	    !big_formula;
 	    nl;
 	    addr;
 	    add4f
-	  ];    
-	if s = 3 then
+	  ];   
+
+      (*Ici, on fait les substitutions le plus tôt possible : dès que s >= 4, on ne fait plus jamais appel à b0. La raison de faire la substitution à ce moment est la même que précédemment : la substitution prend moins de temps lorsque la formule est encore petite.*)
+      
+	if s = 3 || !Param.steps <= 3 then
 	  begin
 	    big_formula := subst_vect (a 0) Data.a0 !big_formula;
 	    big_formula := subst_vect (b 0) Data.b0 !big_formula;
@@ -420,11 +438,11 @@ let inverse_md5 digest  =
   (*big_formula := subst_32 (a 0) Data.a0 !big_formula;*)
   (*big_formula := subst_vect 1  !big_formula*)
   
-  let partial_input = parse_partial_input () in
-  if Array.length partial_input = 0 then 
+  formulaeToCnf (And(initialize digest partial_input , !big_formula))
+  (*if Array.length partial_input = 0 then 
     formulaeToCnf (And(initialize digest partial_input , !big_formula))
   else
-    formulaeToCnf (And (initialize digest partial_input, subst_vect 1 (Array.sub partial_input 0 !Param.partialSize) !big_formula) )
+    formulaeToCnf (And (initialize digest partial_input, subst_vect 1 (Array.sub partial_input 0 !Param.partialSize) !big_formula) )*)
 
 (*** Main function 
      * Digest : tableau de 128 bits ***)
