@@ -83,21 +83,16 @@ let computeRes fn_input =
       let cnf = Generate.genCNF digest in
 
 
-      log ~level:Low ( sprintf "**************** Time to compute formula ********************* \n             %f sec \n" (Sys.time () -. beg_time));
-
 
       log ~level:Low "Displaying CNF...";
       let cnf_display = Formula.displayCnf cnf in
       (* log ~level:Low (sprintf "CNF is \n%s" cnf_display); *)
-      log ~level:Low ( sprintf "**************** Time to compute string  ********************* \n             %f sec \n" (Sys.time () -. beg_time));
 
       (* Write this in CNF file *)
       log (sprintf "Writing CNF in %s..." fn_cnf);
       let oc = open_out fn_cnf in
       Printf.fprintf oc  "%s\n" cnf_display;
       close_out oc;
-
-      log ~level:Low ( sprintf "**************** Time before minisat ********************* \n             %f sec \n" (Sys.time () -. beg_time));
 
 
       (* Launch Sat-solver on CNF *)
@@ -122,7 +117,6 @@ let computeRes fn_input =
       close_in resc;
 
 
-      log ~level:Low ( sprintf "**************** Time after minisat ********************* \n             %f sec \n" (Sys.time () -. beg_time));
 
 
       (* Print the result (SAT?)*)
@@ -154,7 +148,8 @@ let computeRes fn_input =
 	  let digest2 = Md.compute input in
 	  log (sprintf "Computed digest is: [ %s]" (Data.displayDigest digest2));
 	  log (sprintf "==> Are they equal?: %b" (Data.eqDigest digest digest2));
-	  log (sprintf "**************** Total time ********************* \n             %f sec \n" (Sys.time () -. beg_time))
+	  log (sprintf "**************** Temps de calcul de la formule ********************* \n             %f sec \n" (Sys.time () -. beg_time))
+	      (*ici, le temps de minisat n'est pas compté*)
 	end
   end
      

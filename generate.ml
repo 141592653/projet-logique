@@ -21,10 +21,10 @@ open Data
 
 (*ce serait mieux de faire un open mais ça marche pas...*)
 (*choix du mot*)
-let choice1 i =  i
-let choice2 i =  (5*i + 1) mod 16
-let choice3 i =  (3*i + 5) mod 16
-let choice4 i =  (7*i) mod 16
+let choice1 s =  s
+let choice2 s =  (5*s + 1) mod 16
+let choice3 s =  (3*s + 5) mod 16
+let choice4 s =  (7*s) mod 16
 
 (*renvoie la fonction de choix du mot de 32 bits dans input associée au round r*)
 let choice r = 
@@ -57,17 +57,17 @@ let count_true bool_arr =
   let fold_func n b = if b then n + 1 else n in 
   Array.fold_left fold_func 0 bool_arr
 
-(*transforme un entier en litéral*)
+(*transforme un entier (une variable) en litéral*)
 let pos n = Lit(Pos n)
 let neg n = Lit(Neg n)
 
-(*transforme un entier et un booléen en littéral*)
+(*transforme un entier (une variable) et un booléen en littéral*)
 let lit n b = 
   if b then 
     pos n
   else
     neg n
-
+(********** Liste de fonctions permettant d'éviter de réfléchir aux numéros des variables qu'on est en train de manipuler**********)
 (*Variables de 1 à 512 : input, s est le numéro du steo*)
 let input s =  1 + s*32
 
@@ -183,6 +183,7 @@ let i b_start c_start d_start non_lin_start =
   done;
   !formula_i
 
+(*permet de choisir la bonne fonction linéaire en fonction du round*)
 let non_lin_func round = 
   match round with 
     |0 -> f
@@ -213,13 +214,14 @@ let test_f digest =
 
 (** ****************************** Addition - rotation ***************************)
 
-let modz a b = 
+let modn a b = 
   let c = a mod b in 
   if c >= 0 then 
     c 
   else
     c + b
 
+(*Permet, selon la distribution des deux termes et de la retenue donnée par l'entier n compris entre 0 et 7, de donner sous forme d'implication la valeur de la somme et de la retenue suivante*)
 let formula_add_rot_bool addend1 addend2_rot carry result i r n =
   let bool_arr = int_to_bin n 3 in
   (* le nombre de booléens à la valeur true caractérise exactement le résultat de la somme et les deux retenues*)
@@ -227,7 +229,7 @@ let formula_add_rot_bool addend1 addend2_rot carry result i r n =
   let sum_res = int_to_bin nb_true 2 in 
   Imply(list_to_formula [
     lit (addend1 + i) bool_arr.(0);
-    lit (addend2_rot + (modz (i - r) 32)) bool_arr.(1) ;
+    lit (addend2_rot + (modn (i - r) 32)) bool_arr.(1) ;
     lit (carry + i) bool_arr.(2)
   ],
 	if i = 31 then
@@ -240,7 +242,7 @@ let formula_add_rot_bool addend1 addend2_rot carry result i r n =
   )
 
 (*non testé*)
-(* ici, dep_rot est le numéro de la première variable du mot 32 bits qui subit la rotation et dep_b est le deuxième mot 32 bits qui lui est additionné*)
+(* ici, dep_rot est le numéro de la première variable du mot 32 bits qui subit la rotation et dep_b (ne subit aucune rotation) est le deuxième mot 32 bits qui lui est additionné*)
 let add_rotate addend1 addend2_rot carry result r  = 
   let formula_rot = ref (Equiv ( pos carry, Const false)) in 
   
@@ -290,9 +292,9 @@ let formula_add4_bool addend1 addend2 addend3 add_arr4 carry1 carry2 result i n 
       lit (carry2 + i) bool_arr.(4)
     ] ,
 
-    if i = 31 then
+    if i = 31 then (*Si on est à la fin de l'addition, les retenues s'égarent dans le vide intergalactique*)
       lit (result + i)  sum_res.(0)
-    else if i = 30 then
+    else if i = 30 then (* ici, ce n'est que la deuxième retenue qui disparait*)
       list_to_formula [
 	lit (result + i)     sum_res.(0);
 	lit (carry1 + i + 1) sum_res.(1);
@@ -319,6 +321,7 @@ let add4 addend1 addend2 addend3 add_arr4 carry1 carry2 result  =
   ) 
   in
   for i = 0 to 31 do 
+    (*Pour chaque distribution possible pour les retenues et les termes, on ajoute l'implication correspondante*)
     for j = 0 to 31 do 
       formula_add4 := And(formula_add4_bool addend1 addend2 addend3 add_arr4 carry1 carry2 result i j, !formula_add4)
     done
@@ -326,7 +329,6 @@ let add4 addend1 addend2 addend3 add_arr4 carry1 carry2 result  =
   !formula_add4
 
 
-(*vectK.(0) = 0xd76aa478*)
 (*Pour tester la fonction add : test_add dans generate et dans md puis vérifier que le premier octet du digest reste le meme.*)
 let test_add digest = 
   formulaeToCnf (And(bound_digest_test_add digest, add4 1 33 65 vectK.(0) 97 129 481))
@@ -335,27 +337,13 @@ let test_add digest =
 (** **************************** Initialisation ******************************* **)
 let initialize digest partial_input = 
   let init_formula = ref (Const true) in 
-  (*for i = 0 to 31 do 
-    init_formula := list_to_formula [
-      !init_formula;
-      (*lit (a 0 + i) a0.(i);
-      lit (b 0 + i) b0.(i);
-      lit (c 0 + i) c0.(i);
-      lit (d 0 + i) d0.(i);*)
-      
-
-      (*lit (last_sum_a + i) digest.(i);
-      lit (last_sum_b + i) digest.(i + 32);	
-      lit (last_sum_c + i) digest.(i + 64);
-      lit (last_sum_d + i) digest.(i + 96)*)
-    ]
-  done;*)
+  (*On se contente d'initialiser les variables dont on connait la valeur afin qu'elles aient la bonne valeur dans l'input que l'on cherche. Mais en pratique, elles ne réapparaitroit jamais dans la formule*)
   for i = 0 to !Param.partialSize - 1 do 
     init_formula := And( !init_formula , lit (i+1) partial_input.(i))
   done;
   !init_formula
 
-
+(*Permet de substituer des variables à partir d'un vecteur de booléens*)
 let subst_vect var_nb bool_arr formula = 
   let rec create_subst i =
     if i = Array.length bool_arr then  []
@@ -363,6 +351,7 @@ let subst_vect var_nb bool_arr formula =
   in
 
   Formula.subst formula (create_subst 0)
+
 
 (*Permet de récupérer la valeur des première variables de l'input*)
 let parse_partial_input () = 
@@ -376,6 +365,11 @@ let parse_partial_input () =
     Data.parseInput input_str 
   |None -> [||]
       
+
+
+
+
+(*Renvoie la formule inversant md5 sous forme cnf*)
 let inverse_md5 digest  = 
   let partial_input = parse_partial_input () in
   let big_formula = ref (Const true) in
@@ -391,6 +385,7 @@ let inverse_md5 digest  =
 			 else 
 			   tmp
       in
+      (*on fait la substitution des variables de l'input que si on en connait certaines*)
       let add4f = if Array.length partial_input = 0 || (nb_var_known <= 0) then 
 	  add4 (a s) (non_lin s) (input (choice r s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s)
 	else
@@ -398,6 +393,7 @@ let inverse_md5 digest  =
 	    (add4 (a s) (non_lin s) (input (choice r s)) vectK.(s) (carry41 s) (carry42 s) (sum4 s))
 	  
       in 
+      (*La formule inversant le step est la conjonction des trois formules précédentes*)
       big_formula := 
 	list_to_formula [
 	    !big_formula;
@@ -407,7 +403,6 @@ let inverse_md5 digest  =
 	  ];   
 
       (*Ici, on fait les substitutions le plus tôt possible : dès que s >= 4, on ne fait plus jamais appel à b0. La raison de faire la substitution à ce moment est la même que précédemment : la substitution prend moins de temps lorsque la formule est encore petite.*)
-      
 	if s = 3 || !Param.steps <= 3 then
 	  begin
 	    big_formula := subst_vect (a 0) Data.a0 !big_formula;
@@ -419,6 +414,8 @@ let inverse_md5 digest  =
     done
   done;
   let last_variables = !Param.rounds * !Param.steps in 
+
+  (*ici , on fait les additions finales et on substitue les variables du digest et celles de a0, b0,c0, d0*)
   big_formula := 
     list_to_formula [
       !big_formula;
@@ -435,14 +432,9 @@ let inverse_md5 digest  =
 	(subst_vect (d 0) Data.d0 
 	   (add_rotate (d last_variables) (d 0) last_carry_d last_sum_d 0));
     ] ;   
-  (*big_formula := subst_32 (a 0) Data.a0 !big_formula;*)
-  (*big_formula := subst_vect 1  !big_formula*)
   
   formulaeToCnf (And(initialize digest partial_input , !big_formula))
-  (*if Array.length partial_input = 0 then 
-    formulaeToCnf (And(initialize digest partial_input , !big_formula))
-  else
-    formulaeToCnf (And (initialize digest partial_input, subst_vect 1 (Array.sub partial_input 0 !Param.partialSize) !big_formula) )*)
+
 
 (*** Main function 
      * Digest : tableau de 128 bits ***)

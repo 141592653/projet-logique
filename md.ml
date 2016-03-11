@@ -30,6 +30,7 @@ let xor b1 b2 = match (b1,b2) with
   |(true,true)|(false,false) -> false
   |(true,false)|(false,true) -> true
 
+(*calcul le xor de deux vecteurs de 32 bits*)
 let xor_32 a b = 
   let res = Array.make 32 false in 
   for i = 0 to 31 do 
@@ -38,7 +39,7 @@ let xor_32 a b =
   res
     
 
-(** Fonction non linéaires *)
+(** Fonction non linéaires utilisées dans MD5, toutes sur 32 bits*)
 
 let f_32 b c d  =
   let ret = Array.make 32 false in 
@@ -75,11 +76,11 @@ let non_linear r =
   |3 -> i_32
   |_ -> failwith "Round supérieur à 4"
 
-(*choix du mot*)
-let choice1 i =  i
-let choice2 i =  (5*i + 1) mod 16
-let choice3 i =  (3*i + 5) mod 16
-let choice4 i =  (7*i) mod 16
+(*choix du mot de l'input en fonction du step*)
+let choice1 s =  s
+let choice2 s =  (5*s + 1) mod 16
+let choice3 s =  (3*s + 5) mod 16
+let choice4 s =  (7*s) mod 16
 
 (*renvoie la fonction de choix du mot de 32 bits dans input associée au round r*)
 let choice r = 
@@ -122,7 +123,8 @@ let add_32 a b =
   done;
   res
 
-let modz a b = 
+(*fonction de modulo dont le résultat est toujours positif*)
+let modn a b = 
   let c = a mod b in 
   if c >= 0 then 
     c 
@@ -133,21 +135,16 @@ let modz a b =
 let left_rotate a n = 
   let res = Array.make 32 false in
   for i = 0 to 31 do 
-    res.(modz (i+n) 32) <- a.(i)
+    res.(modn (i+n) 32) <- a.(i)
   done;
   res
 
 (******************** Fonctions de test *******************)
-
+(*ces fonctions doivent remplacer md5 input et permettent de tester les formules correspondantes dans generate.ml *)
 let test_f input = 
   let input_32 = convert_input_to_32 input in 
   let digest = Array.make_matrix 4 32 true in 
   digest.(0) <- f_32 input_32.(1) input_32.(2) input_32.(3);
-  convert432_to_digest digest
-
-let test_aff input = 
-  let input_32 = convert_input_to_32 input in 
-  let digest = Array.sub input_32 0 4 in 
   convert432_to_digest digest
 
 let test_add_rotate input = 
@@ -162,7 +159,7 @@ let test_add input =
   digest.(0) <-add_32 (add_32 input_32.(0) input_32.(1)) (add_32 vectK.(0) input_32.(2));
    convert432_to_digest digest
 
-(*ici un seul round*)
+(*Calcule le digest associé à input, c'est simplement la traduction en OCaml du pseudo code de wikipédia sans le padding.*)
 let md5 input  = 
   let input_32 = convert_input_to_32 input in 
   let digest = Array.make_matrix 4 32 true in 
@@ -189,7 +186,9 @@ let compute input =
 
 
 	 
-	 (* WEAK HASH let d = Array.make 128 false in 
+(* WEAK HASH :
+
+let d = Array.make 128 false in 
    for i = 0 to 10 do 
    d.(i) <- xor (xor d.(i+10) input.((i*13) mod 512)) (xor input.((i*14 + 1) mod 512) input.((i*15 + 2) mod 512)) 
    done;

@@ -21,13 +21,13 @@ Comme suggéré dans le sujet du projet, j'ai commencé par écrire les fonction
 
 Mes tests étaient d'ailleurs insuffisants car en inversant WeakHash, je me suis rendu compte, après une longue phase de débogage que la fonction de conversion n'était pas correcte. \par
 
-Le temps que j'ai perdu sur cet erreur n'aura pas été totalement inutile car je me suis forcé par la suite à tester toutes les fonctions que j'écrivais, en particulier au moment de l'inversion de MD5. Le fait d'avoir à écrire ces tests m'a d'ailleurs obligé à écrire des fonctions locales sur des variables quelconques (et non uniquement sur les variables pour lesquelles elles sont destinées), ce qui les rend bien plus modulaires.
+Le temps que j'ai perdu sur cet erreur n'aura pas été totalement inutile car je me suis forcé par la suite à tester toutes les fonctions que j'écrivais, en particulier au moment de l'inversion de MD5. Le fait d'avoir à effectuer ces tests m'a d'ailleurs obligé à écrire des fonctions calculant des sous formules sur des variables quelconques (et non uniquement sur les variables pour lesquelles elles sont destinées), ce qui rend ces fonctions bien plus modulaires.
 
 \section{Structure du code}
 \subsection{Organisation des variables}
-Le premier problème qui se posait était la manière d'organiser les variables. Comme le bootstrap le suggéré, mes variables sont simplement représentées par un entier. 
+Le premier problème qui se pose est la manière d'organiser les variables de la formule que l'on souhaite donner à minisat. Comme le bootstrap le suggère, j'ai représenté les variables par un entier. 
 \par
-Tout d'abord, les variables sont organisées en groupes de 32 bits. Un groupe de 32 bits est représenté par l'entier n correspondant à la première variable du groupe. Ainsi, $n + i$ donne la $i^{ème}$ variable du groupe représenté par n. 
+Tout d'abord, les variables sont organisées en groupes de 32 bits. Un groupe de 32 bits est représenté par l'entier n correspondant à la première variable du groupe. Ainsi, $n + i$ donne la $i^{eme}$ variable du groupe représenté par n. 
 \par
 Ensuite, ces groupes (à l'exception des variables de l'input et des quatre additions finales de MD5) sont organisés en steps, chaque step représentant les variables nécessaires à l'inversion de ce step.
 \newline
@@ -67,9 +67,8 @@ L'initialisation consistait à l'origine à forcer la valeur de certaines variab
 \par
 Chaque step $s$ est la conjonction des formules suivantes : 
 \begin{itemize}
-  \item Affectation : la formule d'affectation permet de rendre deux blocs de variables égaux. Elle permet de reproduire les trois affectation $d:= c, c:=b , a:= copy_d$ de la fonction MD5.
-  \item Fonction non linéaire : cette formule permet d'inverser la fonction non linéraire correspondant au step qu'on est en train d'inverser. Le résultat est stické dans $non\_lin_s$.
-  \item Addition de 4 blocs : permet d'additionner $a_s$, le résultat de la fonction non linéraire, la composante $s$ du vecteur $k$ et le bloc de l'input correspondant au step quel'on souhaite inverser. On aurait pu ici combiner simplement des additions de blocs deux à deux mais le nombre de variables aurait alors significativement augmenté : on aurait eu besoin de trois additions et donc de trois blocs pour les retenues et trois blocs pour les résultats. Ici, on divise donc par deux le nombre de variables utilisées en se contentant de deux blocs de retenue et d'un bloc de résultat. Le résultat de l'addition est stocké dans $sum4_s$.
+  \item Fonction non linéaire : cette formule permet d'inverser la fonction non linéaire correspondant au step qu'on est en train d'inverser. Le résultat est stocké dans $non\_lin_s$.
+  \item Addition de 4 blocs : permet d'additionner $a_s$, le résultat de la fonction non linéaire, la composante $s$ du vecteur $k$ et le bloc de l'input correspondant au step que l'on souhaite inverser. On aurait pu ici combiner simplement des additions de blocs deux à deux mais le nombre de variables aurait alors significativement augmenté : on aurait eu besoin de trois additions et donc de trois blocs pour les retenues et trois blocs pour les résultats. Ici, on divise donc par deux le nombre de variables utilisées en se contentant de deux blocs de retenue et d'un bloc de résultat. Le résultat de l'addition est stocké dans $sum4_s$.
   \item Addition-rotation : permet de combiner la rotation du résultat de l'addition de 4 blocs et l'addition de cette rotation à $b_s$. Le résultat est stocké dans $b_{s+1}$. Ici, on évite d'utiliser des variables intermédiaires pour stocker le résultat de la rotation car on peut directement faire la rotation au moment de l'addition. On remarque que cette fonction est également utilisée au moment de l'addition finale avec une valeur de rotation nulle.
 \end{itemize}
 
@@ -77,11 +76,30 @@ Chaque step $s$ est la conjonction des formules suivantes :
 Chacune des formules énumérées ci-dessus est calculée par une fonction indépendante qui prend en paramètre les blocs considérés. L'affectation et la fonction non linéaire ne posent pas de difficultés : l'affectation est une conjonction de littéraux et la fonction non linéaire est déjà écrite sous forme logique dans MD5. Détaillons plutôt le calcul de la formule de l'addition de 4 blocs. 
 \par
 Pour chaque variable du bloc de résultat, j'ai besoin d'une conjonction de 32 formules. En effet, selon la valeur des trois termes additionnés et des deux retenues, la sommes ou les retenues seront différentes. Ainsi, pour chacune des distributions possibles pour les 5 variables sus-citées, on donne sous la forme d'une implication la valeur de vérité des retenues suivantes et de la somme.
+
 \section{Bilan et améliorations}
-Comparaison entre 3 addition de 2 blocs et une addition de 4 blocs. Est-ce que enlever a,c et d est rentable? Doit-on implémenter les autres fonctions non linéaires?
+Mon implémentation permet de casser honest-digest dans les instances indiquées dans le tableau ci-dessous. Les temps d'exécution, qui sont ici à titre indicatif, correspondent aux temps d'exécution sur mon ordinateur personnel (on aurait presque pu diviser les temps d'exécution par deux en utilisant un ordinateur de la salle 411). Ils sont indiqués en secondes et sont écris sous la forme "temps de génération de la formule + temps de résolution par minisat".
+\par
 
-\section{Conclusion}
+\vspace{0.4cm}
+\begin{tabular}{|c|c|c|c|}
+   \hline
+   	Nombre de rounds & Nombre de steps & Temps (sans info) & Temps (avec info) \\
+   \hline
+   1 & 16 & 1,99 + 0.15 & 2,61 + 0,03 \\
+   \hline
+   2 & 12 & 2,72 + 3,48 & 3,54 + 0,97 \\
+   \hline
+   3 & 8 & 2,83 + 6,71 & 3,68 + 16,87\\
+   \hline
+   4 & 5 & 2,42 + 1,88 &  X\\
+   \hline
+\end{tabular} 
+\vspace{0.4cm}
 
+Pour améliorer le code, il serait possible d'une part de diminuer le nombre de formules pour encoder le problème de l'addition mais aussi d'implémenter les améliorations que Florian Legendre, Gilles Dequen et Michaël Krajecki dans l'article \textit{Inverting thanks to a SAT-Solver}
+
+Les performances que j'ai obtenues sont à peine moins bonnes que celles obtenues par Florian Legendre, Gilles Dequen et Michaël Krajecki sans l'amélioration finale : ceux-ci parviennent à inverser 2 rounds 13 steps. Les idées d'amélioration précédentes permettrait donc de me faire gagner environs 3 steps.
 
 
 

@@ -41,6 +41,7 @@ let rec displayFormula = function
   | Equiv (f1,f2) -> sprintf "{%s} <==> {%s}" (displayFormula f1) (displayFormula f2)
     
 
+(*Cette fonction permet d'obtenir une formule équivalente à f ne comportant plus ni Not, ni Xor, ni Imply, ni Equiv et d'enlever les constantes qui apparaissent*)
 let rec simple  f = match f with 
   |Const b -> Const b
   |Lit l -> Lit l
@@ -71,9 +72,8 @@ let rec simple  f = match f with
   |Imply(f1,f2) -> simple(Or(Not(f1),f2))
   |Equiv(f1,f2) -> simple(And(Imply(f1,f2),Imply(f2,f1)))
     
-
+(*Permet de substituer les variables du premier élément des couples de la liste tau par des constantes booléennes (stockées dans le second élément du couple)*)
 let subst f tau = 
- (*) let f_simple = simple f in *)
   let rec subst_rec f x b = match f with 
     |Const(_) -> f
     |Lit (Pos d) when (d = x) -> Const(b)
@@ -94,7 +94,7 @@ let subst f tau =
     
   
 let formulaeToCnf fl = 
-  (*ici, pre correspond à preCcopute : on calcule d'abord la formule sous forme cnf mais avec le type formule puis on convertit avec preToCNF au type cnf.*)
+  (*ici, pre correspond à preCmopute : on calcule d'abord la formule sous forme cnf mais avec le type formule puis on convertit avec preToCNF au type cnf.*)
   let rec simpleToPre f = match f with 
     |Const _ | Lit _ -> f
     |Or(f1,f2) -> let nf1 = simpleToPre f1 and nf2 = simpleToPre f2 in
@@ -107,7 +107,7 @@ let formulaeToCnf fl =
     |And(f1,f2) -> And(simpleToPre f1, simpleToPre f2)
     |_ -> f
   in
-  
+  (*transforme la fomule sous forme cnf de type formula en type cnf*)
   let rec preToCNF f = match f with 
     |Lit (l) -> [[l]]
     |Or(f1,f2) -> [(List.hd (preToCNF f1)) @ (List.hd (preToCNF f2))]
@@ -124,7 +124,7 @@ let formulaeToCnf fl =
 
 (*********************** Conversion au format dimacs ************************)
 
-(*compte grâce à une table de hachage le nombre de variables dans une formule*)
+(*Ici, on se contente de chercher la plus grande variable utilisée dans la formule*)
 let nb_var_cnf cnf = 
   let nb_var = ref 0 in 
   let rec nb_var_clause c = 
@@ -150,9 +150,8 @@ let displayClause c =
     |l::q -> (displayLit l)^" "^(displayClause_rec q)
   in
   displayClause_rec c 
-  (*(String.concat " " clause_str)*)
 
-(* les tests montrent que ma fonction de displayClause_rec est plus rapide que le concat. Par contre, la meme fonction pour displaycnf est catastrophique : on passe de 1,4 s pour 16 steps à plusieurs minutes.*)
+(* les tests montrent que ma fonction de displayClause_rec est plus rapide que le concat. Par contre, utiliser ^ dans  displaycnf est catastrophique : on passe de 1,4 s pour 16 steps à plusieurs minutes.*)
 
 (******************Affichage d'une formule cnf *******************)
 let displayCnf cnf = 
