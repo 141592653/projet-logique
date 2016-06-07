@@ -1,0 +1,515 @@
+\documentclass[11pt,a4paper,fleqn]{report}
+\usepackage[T1]{fontenc}
+\usepackage[francais]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[toc,page]{appendix} 
+\usepackage{amsfonts,amsmath,amssymb,amsthm}
+\usepackage[top=4cm]{geometry}
+\usepackage{calrsfs}
+\usepackage{csquotes}
+\usepackage{bussproofs}
+
+\EnableBpAbbreviations
+\newcommand{\UICm}[1]{\UIC{$#1$}}
+\newcommand{\AXCm}[1]{\AXC{$#1$}}
+\newcommand{\BICm}[1]{\BIC{$#1$}}
+\newcommand{\TICm}[1]{\TIC{$#1$}}
+\newcommand{\RLm}[1]{\RL{$#1$}}
+\newcommand{\LLm}[1]{\LL{$#1$}}
+
+\newcommand{\D}{\mathcal{D}}
+\newcommand{\C}{\mathcal{C}}
+\newcommand{\Cref}{\mathcal{C}_{ref}}
+\newcommand{\Po}{\mathcal{P}}
+\newcommand{\PR}{\mathcal{P}_R}
+\newcommand{\PF}{\mathcal{P}_F}
+\newcommand{\Sig}{\mathcal{S}_{ig}}
+\newcommand{\Serv}{\mathcal{S}_{erv}}
+
+\newcommand{\Envs}{\Gamma,\Pi}
+\newcommand{\Envsp}{\Gamma^\prime,\Pi^\prime}
+\newcommand{\Envspp}{\Gamma^{\prime\prime},\Pi^{\prime\prime}}
+
+\begin{document}
+\title{Sémantique d'un langage orienté composants : COMPO}
+\author{Julien RIXTE}
+\maketitle
+
+\tableofcontents
+
+\newtheorem{prop}{Proposition}
+
+\chapter{Introduction}dzd
+
+\chapter{Description du langage}
+
+
+
+\section{Syntaxe}
+\begin{figure}[ht!]
+\framebox[\textwidth][c]
+{\parbox{\textwidth}
+{\small
+
+\begin{description}
+
+\item[Programme (dans un service)]:
+
+\begin{align*}
+&Name &::=~& camelCase \\
+&Expr &::=~& Name ~|~ Expr.Name(Expr, ... , Expr) ~|~ Name \textbf{@} Expr \\
+&Prog &::=~& \perp ~|~ Prog;Prog ~|~ Name := Expr ~| \\
+	&&&\qquad \textbf{connect} ~ Name ~ \textbf{to} ~ Expr ~|~ \textbf{return}~Prog  
+\end{align*}
+
+
+\item[Port]:
+\begin{align*}
+&Sig &::=~& Name(Name,...,Name)~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\\
+&List[Ens] &::=~& \epsilon ~|~ Ens;List[Ens]\\
+&Port &::=~& Name : \{List[Sig]\}
+\end{align*}
+
+
+\item[Descripteur] :
+\begin{align*}
+&Serv &::=~& \textbf{service} ~ Sig ~ \{Prog\} \\
+&Descr &::=~& \textbf{descriptor} ~ Name ~ \textbf{extends} ~ Name\{  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\\
+&&&~~~~\textbf{provides}~\{List[Port]\} \\
+&&&~~~~\textbf{requires}~\{List[Port]\} \\
+&&&~~~~\textbf{internally~requires}~\{List[Port]\} \\
+&&&~~~~\textbf{architecture}~\{List[Connect]\} \\
+&&&~~~~List[Service]~(sans~;) \\
+&&&\}  
+\end{align*}
+
+\end{description}
+
+}}
+\caption{Syntaxe abstraite de Compo}
+
+
+\label{fig:syn}
+\end{figure}
+À rajouter : ofKind (spa13 p.165) et * (universal interface)
+
+\section{COMPO en pratique}
+L'instruction $\textbf{requires}~Name : Sig$ permet de déclarer une variable locale.
+
+
+
+
+
+\chapter{Sémantique}
+
+Dans cette section, nous allons décrire une sémantique à grands pas de COMPO. Le choix d'une sémantique à grand pas tient surtout du fait que le but du stage est de fixer de manière précise la manière dont se comporte le langage. Il apparaît alors que la sémantique opérationnelle à grand pas permet de satisfaire ces exigences\cite{Cha13}. En effet, l'abondance de points fixes dans une sémantique dénotationnelle en rend la compréhension plus difficile et les sémantiques à petit pas ne traduisent pas aussi directement ce que fait une instruction qu'une sémantique à grands pas.
+
+\blockquote{We speculate that it would be easier to convince the standards committee in charge of a given programming language of the adequacy of a big-step formalization than to convince them of the adequacy of a small-step formalization.}{\cite{Cha13}}
+
+\section{Les environnements}
+Afin de rendre compte de l'état d'un programme en COMPO à tout moment de son exécution, nous allons avoir besoin de deux sortes d'environnements. Tous les environnements que nous allons introduire seront de la même forme : ce sont des fonctions partielles d'un ensemble d'identifiants vers un domaine de valeurs.
+
+\paragraph{L'environnement des descripteurs}
+À tout moment de l'exécution du programme, on a la possibilité d'invoquer l'opération \textbf{new} des descripteurs qu'on a déclarés. Nous allons donc avoir besoin d'un environnement $\Delta : Name \rightarrow \mathcal{D}$, où $\mathcal{D}$ est l'ensemble des valeurs de type Descripteur. Une fois qu'on aura évalué tous les descripteurs, cet environnement ne changera pas au cours de l'exécution (TODO à moins qu'on puisse déclarer de nouveaux descripteurs à partir de la couche réflexive).
+
+\paragraph{L'environnement des ports requis}
+Cet environnement change au cours de l'exécution. En effet, nous allons considérer que toutes les variables que nous utiliserons sont des ports requis. Nous avons donc besoin d'une fonction partielle $\Pi : Name \rightarrow \PR$, où $\PR$ est l'ensemble des valeurs (défini par la suite) de type Port requis .
+
+\paragraph{L'environnement des composants}
+Cet environnement, que nous pensions au début superflu, va nous permettre d'utiliser des références sur les composants. En effet, si les composants ne changeaient pas au cours de l'exécution,  connaître à tout moment l'ensemble des descripteurs déclarés et les connexions entre les composants (et non la liste des composants eux-même) suffirait pour exécuter le programme. Cependant, lors de l'élaboration de cette sémantique nous nous sommes rendus compte que si un composant changeait une de ses connexions sur un de ses ports, les autres ports ne verraient pas ce changement.
+(TODO soit enlever cette explication, soit donner un exemple avec l'ancienne sémantique). 
+
+Comme plusieurs ports peuvent être connectés à un même composant, nous allons poser une fonction partielle $\Gamma : \mathbb{N} \rightarrow \C$, où $\C$ est l'ensemble des valeurs de type composant (défini par la suite). Chaque composant aura alors un identifiant unique. Par souci de lisibilité, nous noterons $\Cref= \mathbb{N}$ pour sous-entendre que les valeurs de $\Cref$ sont des références vers un composant et non des entiers quelconques. Nous noterons $\Gamma + (max \rightarrow c)$ à la place de $\Gamma + (max(Dom(\Gamma)) + 1\rightarrow c)$ par soucis de lisibilité.
+
+
+
+
+
+\section{Domaine de valeurs}
+Dans la sémantique que nous allons donner, nous allons avoir besoin de plusieurs domaines de valeurs. Un résumé des domaines de valeurs est donné par la table \ref{tab:DomVal}. Des précisions sur les notations utilisée pour les domaines de valeur sont données en annexe.
+
+\paragraph{L'effet de bord}
+COMPO n'étant pas pur, certaines instructions sont des effets de bords. Nous avons donc besoins d'une valeur associée à un effet de bord, que nous appellerons $()$ à la ML.
+
+\paragraph{Les signatures}
+Dans l'état actuel de COMPO, les signatures ne sont pas typées. On en déduit que deux signatures sont égales si et seulement si elles ont le même nom et le même nombre d'arguments. Comme on n'a besoin que de ces deux informations, on  pose :
+\[\Sig = Name \times \mathbb{N}\]
+
+\paragraph{Les services}
+Un service est l'implémentation d'une signature. Pour caractériser un service, nous avons besoin de trois informations : 
+\begin{itemize}
+\item[•] son \textsf{nom}, qui en réalité est stocké dans la signature de ce service.
+\item[•] la liste ordonnée des noms des \textsf{arguments} qu'il requiert. On pose, pour un ensemble $E$ l'ensemble des listes d'éléments de $E$ $\mathcal{L}(E)$ défini par induction comme suit : 
+\begin{itemize}
+\item $ \mathbf{nil} \in \mathcal{L}(E)$
+\item $ x \in E  \implies l \in \mathcal{L}(E) \implies x::l \in \mathcal{L}(E) $
+\end{itemize}
+
+Les arguments peuvent alors être représentés par $\mathcal{L}(Name)$.
+\item[•] l'\textsf{implémentation} du service ie un élément de $Prog$.
+\end{itemize}
+On en déduit
+\[\Serv = \Sig \times \mathcal{L}(Name)\times Prog\]
+
+On remarquera qu'ici, nous avons une information redondante : le nombre d'arguments dans la signature et la liste des arguments du service. Cela permet de simplifier les règles de la sémantique afin de pouvoir vérifier l'égalité des signatures plus aisément. 
+
+\paragraph{Les connexions} Pour représenter les connexions, deux options s'offrent à nous : 
+\begin{itemize}
+\item la première consiste à ajouter un nouveau type de valeur \textsf{connexion} qui relirait les ports entre-eux. 
+\item la seconde est de stocker directement le composant auquel le port que l'on considère est connecté dans sa sémantique.
+\end{itemize}
+
+Nous choisirons ici la seconde option. Ce choix est justifié par deux faits. Dans sa thèse, Petr Spacek décide de ne pas réifier les connections (TODO : citation + explication) et le fait de considérer une connexion comme une valeur revient à la réifier (TODO justifier parce que c'est quand même un peu gratuit). De plus, cela simplifiera les règles car on n'aura pas à passer par un objet un intermédiaire pour récupérer le composant connecté au port considéré lors de l'appel d'un service.
+
+\paragraph{Les ports fournis} Les ports fournis fournissent un ensemble de services. Il est possible que deux ports d'un même composant fournissent le même service. Ainsi, dans l'optique de construire un interpréteur à partir de la sémantique donnée ici, il semble plus raisonnables que les services eux-mêmes ne soient pas contenus dans les ports fournis mais plutôt dans les composants. C'est pourquoi les ports fournis ne contiendront que la signature des services qu'ils fournissent et non les services dans leur intégralité.
+
+De plus, l'ordre dans lequel les ports apparaissent n'importe pas. Nous utiliserons par conséquent des ensembles de signatures plutôt que des listes.
+
+Enfin, nous devons représenter les délégations d'un port fourni vers un autre port fourni, car nous avons choisi de ne pas avoir de valeur \textsf{connexion}. On a donc besoin de connaître le composant et le port fourni auquel notre port est connecté. En fait, le composant contient l'ensemble de ses ports fournis. Il nous suffit donc de connaître le nom du port fourni pour pourvoir l'identifier.
+
+Un port fourni qui n'est pas délégué sera dans la sémantique délégué à lui-même. Nous n'aurons donc pas à distinguer les ports délégués ou non mais il faudra cependant faire un test d'égalité à chaque appel d'un port fourni.
+
+\[\PF = \mathfrak{P}(\Sig)\times Name \times \Cref\]
+
+\paragraph{Les ports requis} 
+De la même manière que pour les ports fournis, les ports requis sont avant tout un ensemble de signatures. Examinons à présent comment établir les connexions avec les autres ports.
+
+Un port requis peut être ou bien connecté à un port fourni, ou bien délégué à un autre port requis. Nous allons , comme pour le port fourni, stocker le composant auquel le port est connecté. Mais cette fois, nous voulons connaître le port auquel notre port requis est connecté et non les services contenus dans le composant. Il nous faut donc également le nom du port qui nous intéresse. Les noms des ports étant uniques au sein d'un même composant, nous avons toutes les informations nécessaires pour identifier le port auquel notre port est connecté.
+\[\PR = \mathfrak{P}(\Sig) \times Name \times \Cref\]
+
+\paragraph{Les composants}
+On trouve plusieurs sortes d'objet dans un composant : 
+\begin{itemize}
+\item[•] des ports requis, connectés ou non
+\item[•] des ports fournis
+\item[•] des services
+\end{itemize}
+
+Les ports requis correspondent en fait à un environnement local propre à chaque descripteur. Nous considérerons donc chaque port requis du composant comme une variable dont le nom est le nom du port en question. Ceci permet d'unifier l'appel d'un service par une variable locale ou par un port requis du composant.
+
+\[\C=(Name \rightarrow \Serv) \times (Name \rightarrow \PF)  \times (Name \rightarrow \PR)\]
+
+
+
+\paragraph{Les descripteurs}
+De la même manière que les classes de Smalltalk sont elles-mêmes des objets \cite{Cla97}, les descripteurs sont considérés comme des composants  (TODO lire le passage exact dans Spacek). Ceci transparaît dans la sémantique car le domaine des descipteurs est simplement un sous-ensemble du domaines des composants. En effet, dans cette sémantique, un descripteur est un composant qui offre le service \textbf{new} (TODO ??) sur son port \textsf{default}. Ceci est un peu réducteur car il devrait également contenir d'autres services d'introspection mais ceci ne changerait rien à la sémantique. 
+
+$\D = \{c\in \C, c = (serv,\_,\_)~et~ \textbf{new} \in serv\}$
+
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{|c|c|l|}
+
+\hline
+Notation & Type de valeur & Domaine\\
+\hline
+ $\Sig$  &  Signatures & $Name \times \mathbb{N}$\\
+ $\Serv$ & Services & $\Sig \times \mathcal{L}(Name) \times Prog$ \\
+ $\PF$ & Ports fournis & $\mathfrak{P}(\Sig) \times Name \times \Cref$\\
+ $\PR$ & Ports requis & $\mathfrak{P}(\Sig) \times Name \times \Cref$ \\
+ $\C$ & Composants & $(Name \rightarrow \Serv) \times (Name \rightarrow \PF) \times (Name \rightarrow \PR)$ \\
+ $\D$ &  Descripteurs & $ \{c\in \C, c = (serv,\_,\_)~et~ \textbf{new} \in serv\} $\\
+
+\hline
+\end{tabular}
+\end{center}
+\label{tab:DomVal}
+\caption{Domaines des valeurs}
+\end{table}
+
+\section{Un peu de blabla explicatif}
+Dans la sémantique que nous allons décrire, nous allons utiliser les styles dénotationnel et opérationnel. Les programmes au sein des services seront écrits dans une sémantique à grand pas alors que les déclarations de structures de données du langage se feront en style dénotationnel. Ce choix s'explique par le fait que lorsqu'une structure est déclarée dans un langages, ce sont les données qu'elles contient qui nous intéressent. La sémantique dénotationnelle permet alors juste de rendre ces données accessibles dans le monde mathématique (en quelque sorte c'est un parser amélioré). En revanche, lorsque l'on considère les programmes dans les services , c'est l'exécution du programme qui nous intéresse et on a donc plutôt tendance à se tourner vers une sémantique dénotationnelle. (TODO ce bloc est beaucoup trop long et très mal écrit)
+
+\paragraph{Sémantique d'une liste d'éléments}
+Une structure qui revient de manière récurrente est la liste d'éléments. On trouve en effet dans COMPO des listes d'arguments, de ports, de services, de signatures... Nous avons donc besoin d'une fonction qui prend en paramètre une fonction sémantique sur un type d'élément donné et qui renvoie une fonction sémantique sur une liste de ce type d'élément. Plus formellement, on a $[\![]\!] : E \rightarrow F$ (où $E$ est un ensemble d'éléments de la syntaxe du langage et $F$ un domaine de valeurs) et on veut obtenir $[\![]\!]_{list} : List[E] \rightarrow \mathfrak{P}(E)$.
+
+La définition d'une telle fonction est naturelle : 
+\[\begin{array}{lll}
+lift_\mathfrak{P} :&(E\rightarrow F) &\rightarrow List[E] \rightarrow \mathfrak{P}(E))\\
+&[\![]\!] &\rightarrow \begin{cases}
+\epsilon &\rightarrow \emptyset \\
+x_1; ... ; x_n &\rightarrow \{[\![x1]\!]\}\cup lift_\mathfrak{P}([\![]\!])(x_2;...;x_n)
+\end{cases}
+\end{array}
+\]
+
+De la même manière, on peut poser
+\[\begin{array}{lll}
+lift_\mathcal{L} :&(E\rightarrow F) &\rightarrow List[E] \rightarrow \mathcal{L}(E))\\
+&[\![]\!] &\rightarrow \begin{cases}
+\epsilon &\rightarrow \mathbf{nil} \\
+x_1; ... ; x_n &\rightarrow [\![x1]\!] :: lift_\mathcal{L}([\![]\!])(x_2;...;x_n)
+\end{cases}
+\end{array}
+\]
+\vspace{0.5cm}
+
+Par la suite, nous prendrons la liberté d'écrire $[\![]\!](x_1;...;x_n)$ à la place de \newline $lift_{\mathfrak{P}/\mathcal{L}}([\![]\!])(x_1; ... ; x_n)$ lorsqu'il n'y aura aucune ambiguïté.
+
+
+\section{Sémantique des structures du langages}
+Ici, nous allons décrire un sémantique dénotationnelle pour la déclaration d'un port, c'est-à-dire une expression du langage $Name : \{List[Sig]\}$. (TODO : explication du choix d'une sémantique dénotationnelle) Nous avons donc besoin de décrire au préalable la sémantique d'une signature (appartenant au langage $Name(Name,...,Name)$).
+
+\paragraph{Sémantique des signatures}
+Définissons la fonction $[\![]\!]_{sig} :  Sig \rightarrow \Sig $. Celle-ci va se contenter de récupérer le nom du service et de compter le nombre d'arguments. Posons donc une fonction auxiliaire $[\![]\!]_{args} : (Name, ... , Name) \rightarrow \mathbb{N}$ qui compte le nombre d'arguments dans une liste (syntaxique) d'arguments.
+\[\begin{array}{llll}
+&[\![()]\!]_{args} &=& 0\\
+&[\![(arg_1,...,arg_n)]\!]_{args} &=& 1 + [\![(arg_1,...,arg_{n-1})]\!]_{args} 
+\end{array}\]
+
+On déduit alors de manière directe
+\[[\![name_{sig}(arg_1,...,arg_n)]\!]_{sig} = <name_{sig}, [\![(arg_1,...,arg_n)]\!]_{args}> \]
+
+\paragraph{Sémantique d'un service}
+Comme nous l'avons vu dans la section précédente, un service est composé d'une signature, de la liste du nom de ses arguments et d'un corps exécutable.
+
+\begin{align*}
+[\![service~name(arg1,...,argn)\{
+	body
+	\}
+]\!]_{serv}&= <[\![name(arg1,...,argn)]\!]_{sig},\\
+&\qquad  lift_{\mathcal{L}}(Id_{Name})(arg1,...,argn), body>
+\end{align*}
+
+\subsection{Sémantique d'un port}
+Bien que la déclaration d'un port soit identique pour les ports requis et pour les ports fournis, nous allons avoir besoin de deux fonctions différentes de même domaine $Port$ mais dont le codomaine diffère. Ceci est problématique : notre sémantique n'est pas syntax directed. En réalité, lorsque nous évaluerons le programme dans sa globalité, nous saurons laquelle des deux sémantiques utiliser et il n'y aura pas d'ambiguïté.
+
+\paragraph{Port fourni} Comme nous l'avons vu dans la section précédente, un port fournis non délégué est en fait connecté à lui-même. La sémantique suivante en découle naturellement : 
+\[[\![\{sig_1; ... ; sig_n\}]\!]_{pf} = <[\![]\!]_{sig}(sig_1; ... ; sig_n), \otimes, 0>
+\]
+(TODO on a besoin de $\Gamma$ en argument...
+
+\paragraph{Port requis}
+Afin d'éviter d'avoir à faire une distinction entre un port connecté et un port non connecté, on va considéré qu'un port requis est toujours connecté à un port. Cependant, il est possible qu'un port ne soit jamais connecté et que cela ne provoque pas d'erreur (il faut alors qu'aucun service ne soit appelé sur ce port. En fait, on peut observer que si on connecte un port requis à un port fourni vide (ie qui ne fournit aucun service), on obtient le même comportement que si le port n'était pas connecté : à chaque appel d'un service sur le port non connecté, le programme plante.
+
+Posons donc $\otimes = (void,\emptyset,0)$ et $C_{\otimes} = (\emptyset,{\otimes},[])$ qui représentent respectivement un port fourni vide et un composant n'ayant aucun port requis, aucun service et ayant un seul port requis : $\otimes$. On supposera qu'à tout moment de l'exécution, $\Gamma(0) = C_\otimes$. Un port non connecté sera alors un port connecté au port $\otimes$.
+
+On peut alors poser 
+\[[\![\{sig_1; ... ; sig_n\}]\!]_{pr} = <[\![]\!]_{sig}(sig_1; ... ; sig_n), \otimes, 0>
+\]
+
+Rappelons que nous avons pris la liberté d'écrire $[\![]\!]_{sig}(sig_1; ... ; sig_n)$ en lieu et place de $lift_\mathfrak{P}([\![]\!]_{sig})(sig_1; ... ; sig_n)$.
+
+
+\subsection{Sémantique d'un descripteur}
+
+\begin{align*}
+&\textbf{descriptor} ~ Name ~ \textbf{extends} ~ Name\{ \\
+&\qquad\textbf{provides}~\{List[Port]\} \\
+&\qquad\textbf{requires}~\{List[Port]\} \\
+&\qquad\textbf{internally~requires}~\{List[Port]\} \\
+&\qquad\textbf{architecture}~\{List[Connect]\} \\
+&\qquad List[Service]~(sans~;) \\
+\}  \\
+\end{align*}
+
+
+\section{Sémantique opérationnelle des programmes}
+Les règles de cette sémantique opérationnelle seront de la forme
+\[environnements \vdash expression~(ou~programme) \implies valeur~;~nouveaux~environnements\]
+Nous avons déjà fait la remarque que l'environnement $\Delta$ des descripteurs ne varie pas au cours de l'exécution (TODO réflexivité?). Afin d'alléger les notations, il apparaîtra donc de manière implicite dans les règles.
+
+\subsection{Quelques simplifications}
+La syntaxe des règles étant lourde, nous allons poser quelques simplifications pour en faciliter la lecture.
+
+\paragraph{Initialisation d'un environnement}
+Au début de l'exécution des services, nous allons avoir besoin d'initialiser leur environnement de ports requis. Cet environnement doit comporter :
+\begin{itemize}
+\item[•]les ports requis du composant auquel le service appartient
+\item[•]les ports passés en argument
+\end{itemize}
+
+(TODO port local = arg ou var locale)
+
+Une première approche serait de ne faire aucune distinction entre les ports du composant et les ports à portée locale. Le problème est que les modifications qui portent sur les ports du composant doivent rester une fois que le corps du service a terminé. De plus, un port local peut tout-à-fait avoir le même nom qu'un port du composant et que ce dernier ne doit pas être affecté par les modifications du premier.
+
+C'est pourquoi nous n'allons pas simplement inclure l'environnement du composant dans l'environnement du service au moment de l'initialisation de ce dernier. Par conséquent, l'initialisation s'en retrouve simplifiée : elle consiste simplement à créer un environnement pour les arguments.
+
+\paragraph{Utilisation des environnements de ports requis}
+Cependant, cette décision implique une petite difficulté lorsqu'on veut connaître le port associé à une variable : 
+\begin{itemize}
+\item on regarde d'abord si on trouve cette variable dans l'environnement local du service
+\item s'il n'y est pas, on fait alors appel à l'environnement du composant
+\item si on ne le trouve toujours pas, le programme plante
+\end{itemize}
+
+Afin de simplifier ce processus, nous écrirons lorsque $\Pi$ est l'environnement courant et $s$ le composant dans lequel le service exécuté se trouve,
+\[\Pi^+(x) = \begin{cases}
+\Pi(x) & si ~ x\in Dom(\Pi)\\
+s.\Pi_R(x) & si~x\in Dom(s.\Pi_R)\\
+\perp & sinon
+\end{cases}\]
+
+$\Pi^+$ est alors l'environnement local augmenté de l'environnement du composant.
+
+\subsection{Localiser un service}
+Lors de l'appel d'un service, il se peut que nous ayons à parcourir un nombre arbitraire de délégations avant de trouver le composant qui le fourni. Nous allons donc ici définir des fonctions permettant à partir d'un port $p$, du nom $serv$ d'un service de $p$  et des environnements $\Envs$ de récupérer la valeur du service que l'on cherche à appeler.
+
+\paragraph{Cas des ports requis}
+Supposons que $p$ est un port requis. Supposons également que la sémantique a maintenu l'invariant suivant : \[\forall c \in Dom(\Gamma), Dom(c\#\pi_F) \times Im(c\#\pi_F) \cap Dom(c\#\pi_R) \times Im(c\#\pi_R) = \emptyset\] Nous allons alors définir la fonction $findServ_{\Envs} : \PR \times Name \rightarrow \Serv$ de manière récursive : 
+\begin{multline*}findServ_{\Envs}(p,serv) =\\
+\qquad \begin{cases}
+\Gamma(c)\#servs(serv) &\text{si $serv\in \Gamma(c)\#\pi_F(p\#cp)$ et si tout est défini}\\
+findServ_{\Envs}(\Gamma(c)\#\pi_R(p\#cp),serv) &\text{si $\Gamma(c)\#\pi_R(p\#cp)$ est défini}\\
+<serv\#sig,serv\#args,\perp> & \text{sinon}
+\end{cases}
+\end{multline*}
+
+\begin{prop}$findServ_{\Envs}(p,serv)$ est bien défini quelque soit $(p,serv) \in \Po\times\Serv$
+\end{prop}
+\begin{proof}
+
+\end{proof}
+
+\paragraph{Cas des ports fournis}
+Supposons que $p$ est un port fourni. Nous allons faire l'abus de notation d'appeler la fonction qui permet de récupérer la valeur d'un service $findServ_\Envs$ bien qu'en réalité, ce ne soit pas les mêmes fonctions (cependant, elles ont même domaines et codomaines).
+\begin{multline*}findServ_{\Envs}(p,serv) =\\
+\qquad \begin{cases}
+\Gamma(c)\#servs(serv) &\text{si $serv\in \Gamma(c)\#\pi_F(p\#cp)$ et si tout est défini}\\
+findServ_{\Envs}(\Gamma(c)\#\pi_R(p\#cp),serv) &\text{si $\Gamma(c)\#\pi_R(p\#cp)$ est défini}\\
+<serv\#sig,serv\#args,\perp> & \text{sinon}
+\end{cases}
+\end{multline*}
+
+\subsection{Expressions}
+\begin{figure}[ht!]
+\framebox[\textwidth][c]
+{\parbox{\textwidth}
+{\small
+\begin{prooftree}
+\AXCm{}
+\LLm{Var}
+\UICm{\Envs\vdash_{e} x \implies \Pi^+(x); \Envs}
+\end{prooftree}
+\vspace{0cm}
+
+\begin{prooftree}
+\AXCm{\begin{array}{c}
+\Envs\vdash_{e} expr \implies val ; \Envsp\\
+\Envsp\vdash_{e} arg_1 \implies val_{arg_1} ; \Gamma_1,\Pi_1\\
+\vdots\\
+\Gamma_{n-1},\Pi_{n-1}\vdash_{e} arg_n \implies val_{arg_n} ; \Gamma_n,\Pi_n\\
+\end{array}}
+
+\AXCm{\Gamma_n,\Pi_p\vdash_{p} prog \implies val' ; \Gamma^{\prime\prime}, \Pi_p^{\prime}}
+\LLm{Call}
+\BICm{\Envs\vdash_{e} expr.serv(arg_1,...arg_n) \implies val';\Gamma^{\prime\prime},\Pi_n}
+\end{prooftree}
+\hspace{0.2cm} avec :
+ \begin{itemize}
+\item $val, val_{arg_1}, ..., val_{arg_n} \neq \perp$
+\item $val$ est une valeur de type port requis
+\item $\Pi_p = [arg_1\rightarrow val_{arg_1}; ...; arg_n \rightarrow val_{arg_n}]$
+\item $prog = \begin{cases}val_{serv}\#body & \text{si c'est défini et si } val_{serv}\#sig = <serv,n> \\
+\perp &\text{sinon} \end{cases}$
+
+où $val_{serv} = \Gamma(val\#c)\#servs(serv)$
+\end{itemize}
+
+\vspace{0.5cm}
+\begin{prooftree}
+\AXCm{\begin{array}{c}
+\Envs\vdash_{e} expr \implies val ; \Envsp\\
+\Envsp\vdash_{e} arg_1 \implies val_{arg_1} ; \Gamma_1,\Pi_1\\
+\vdots\\
+\Gamma_{n-1},\Pi_{n-1}\vdash_{e} arg_n \implies val_{arg_n} ; \Gamma_n,\Pi_n\\
+\end{array}}
+
+\AXCm{\Gamma_n,\Pi_p\vdash_{p} prog \implies val' ; \Gamma^{\prime\prime}, \Pi_p^{\prime}}
+\LLm{Call_\perp}
+\BICm{\Envs\vdash_{e} expr.serv(arg_1,...arg_n) \implies \perp;\Gamma^{\prime\prime},\Pi_n}
+\end{prooftree}
+\hspace{0.2cm} avec : $\perp \in \{val,val_{arg_1},...,val_{arg_n},val'\}$
+
+\vspace{0.5cm}
+
+
+}}
+\caption{Sémantique des expressions}
+
+
+\label{fig:semexpr}
+\end{figure}
+
+
+
+
+
+
+ 
+\begin{appendices}
+\chapter{Notations}
+\paragraph{Ensembles}
+\begin{itemize}
+\item[•] Nous confondrons les noms des variables dans la syntaxe abstraite de COMPO et les ensembles engendrés par ceux-ci.
+\item[•] Parties d'un ensemble $E$ : $\mathfrak{P}(E)$
+\item[•] Nous distinguerons les valeurs de la sémantique et les chaînes de caractère de la syntaxe en utilisant d'un côté des lettres (TODO: trouver bon mot) normales et de l'autre des lettre rondes.
+\item[•] On pose, pour un ensemble $E$ l'ensemble des listes d'éléments de $E$ $\mathcal{L}(E)$ défini par induction comme suit : 
+\begin{itemize}
+\item $ \mathbf{nil} \in \mathcal{L}(E)$
+\item $ x \in E  \implies l \in \mathcal{L}(E) \implies x::l \in \mathcal{L}(E) $
+\end{itemize}
+
+
+\end{itemize}
+
+\paragraph{Application partielles} 
+\begin{itemize}
+\item[•] $Dom(f)$ : domaine de f.
+\item[•] $f = [i_1 \rightarrow v_1; i_2 \rightarrow v_2 ; ... ; i_n \rightarrow v_n]$ : application partielle de domaine $\{i_1, ... , i_n\}$ telle que $\forall k \in [\![1,n]\!]f(i_k) = v_k$.
+\item[•] $f = [i_1 \rightarrow v_1; i_2 \rightarrow v_2 ; ... ; i_n \rightarrow v_n] ~+~ i_{n+1} \rightarrow v_{n+1}$ : application partielle de domaine $\{i_1, ... , i_n, i_{n+1}\}$ telle que $\forall k \in [\![1,n+1]\!]f(i_k) = v_k$.
+\end{itemize}
+
+
+\paragraph{Domaines de valeurs}
+Chaque domaine est donné sous la forme d'un produit d'ensembles. Cependant, afin de distinguer une liste d'arguments et une valeur, nous écrirons une valeur du domaine $A\times B\times C$ avec une notation de la forme $<a,b,c>$ avec $(a,b,c)\in A\times B \times C$.
+
+De plus, nous aurons souvent besoin de désigner les différents champs de ces valeur. Recourir à des projections serait alors illisible. Nous allons donc donner un nom aux champs des valeurs et nous utiliserons la notation $foo\#bar$ pour désigner le champ $bar$ de la valeur $foo$. Voici un tableau récapitulatif des noms des champs pour les différentes valeurs apparaissant dans la sémantique :
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{|c|c|l|l|}
+
+\hline
+Notation & Type de valeur & Nom des champs & Domaine\\
+\hline
+ $\Sig$  &  Signatures & $<name,nb_{args}>$ &$Name \times \mathbb{N}$\\
+ $\Serv$ & Services & $<sig,args,body>$ &$\Sig \times \mathcal{L}(Name) \times Prog$ \\
+ $\PF$ & Ports fournis & $<sigs,cp,c>$ &$\mathfrak{P}(\Sig) \times Name \times \Cref$\\
+ $\PR$ & Ports requis & $<sigs,cp,c>$ &$\mathfrak{P}(\Sig) \times Name \times \Cref$ \\
+ $\C$ & Composants & $<servs,\pi_F,\pi_R>$ &$(Name \rightarrow \Serv)\times(Name \rightarrow \PF) $\\
+&&& $\qquad \times (Name \rightarrow \PR) $\\
+ $\D$ &  Descripteurs & &$ \{c\in \C, c = (serv,\_,\_)~et~ \textbf{new} \in serv\} $\\
+
+\hline
+\end{tabular}
+\end{center}
+\label{tab:DomVal}
+\caption{Domaines des valeurs}
+\end{table}
+
+
+\paragraph{Environnements}
+vc
+\chapter{Vocabulaire}
+\begin{description}
+\item[Syntax directed] À chaque étape, on ne peut choisir qu'une règle.
+\item[Propriété de la sous-formule] Toutes les formules qui apparaissent dans une preuve sont des sous-formules de la formule prouvée.
+\end{description}
+
+
+\chapter{TODO}
+Expliquer pourquoi la réflexivité aide à écrire une sémantique.
+
+Enlever les noms des ports fournis parce qu'il semble qu'ils ne servent à rien
+
+Si le composant change au cours du temps, les changements ne sont pas pris en compte dans la sémantique. Il vaudrait mieux mettre des références.
+\end{appendices}
+\cite{SDT14}
+\cite{Spa13}
+
+\bibliographystyle{plain}
+\bibliography{ref}
+
+\end{document}
